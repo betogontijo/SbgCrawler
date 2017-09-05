@@ -2,49 +2,38 @@ package br.com.betogontijo.sbgfetcher;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
-public class SbgFetcher {
-	public static String getBody(String path) {
-		SbgSeed sbgSeed = new SbgSeed(path);
-		return sbgSeed.getDocument().text();
-		// BufferedReader br = null;
-		// try {
-		// br = new BufferedReader(new
-		// InputStreamReader(sbgSeed.getInputStream()));
-		// StringBuilder body = new StringBuilder();
-		// String inputLine;
-		// while ((inputLine = br.readLine()) != null) {
-		// body.append(inputLine);
-		// }
-		// return body.toString();
-		// } catch (IOException e) {
-		// e.printStackTrace();
-		// return null;
-		// } finally {
-		// if (br != null) {
-		// try {
-		// br.close();
-		// } catch (IOException e) {
-		//
-		// e.printStackTrace();
-		// }
-		// }
-		// }
+import javax.xml.ws.WebServiceException;
+
+import com.mongodb.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoDatabase;
+import com.sun.xml.internal.ws.Closeable;
+
+import br.com.betogontijo.sbgreader.SbgMap;
+import br.com.betogontijo.sbgreader.SbgPage;
+
+public class SbgFetcher implements Closeable {
+
+	MongoClient mongoClient;
+	@SuppressWarnings("rawtypes")
+	MongoCollection<Map> pageDB;
+
+	public SbgFetcher() {
+		loadCache();
 	}
 
-	public static String processBody(String body) {
-		return body;
-		// return body.replaceAll("[^A-Za-z0-9\\s]", "").replaceAll(" ", " ");
+	private void loadCache() {
+		mongoClient = new MongoClient("localhost", 27017);
+		MongoDatabase database = mongoClient.getDatabase("SbgDB");
+		pageDB = database.getCollection("page", Map.class);
 	}
 
-	public static void main(String[] args) {
-		List<String> documents = new ArrayList<String>();
-		String path = "file://C:/Users/886390/Downloads/";
-		int documentsNumber = 5;
-		for (int i = 1; i <= documentsNumber; i++) {
-			documents.add(processBody(getBody(path + "0" + i + ".html")));
-		}
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public void fetch() {
 		Scanner in = new Scanner(System.in);
 		String query = in.nextLine();
 		List<String> words = new ArrayList<String>();
@@ -61,19 +50,25 @@ public class SbgFetcher {
 			}
 			words.add(word);
 		}
+
 		List<Integer> matches = new ArrayList<Integer>();
-		for (int i = 0; i < documents.size(); i++) {
+		MongoCursor<SbgMap> iterator = pageDB.find(SbgMap.class).iterator();
+		int i = 0;
+		while (iterator.hasNext()) {
+			SbgPage page = new SbgPage(iterator.next());
 			matches.add(0);
 			for (int j = 0; j < words.size(); j++) {
-				if (documents.get(i).contains(words.get(j))) {
+				if (page.containsWord(words.get(j)) > 0) {
 					matches.set(i, matches.get(i) + 1);
 				}
 			}
-		}
-		for (int i = 0; i < documents.size(); i++) {
-			System.out.println(documents.get(i) + " -> " + matches.get(i));
+			System.out.println(page.getPath() + " -> " + matches.get(i++));
 		}
 		in.close();
 		stream.close();
+	}
+
+	public void close() throws WebServiceException {
+		mongoClient.close();
 	}
 }

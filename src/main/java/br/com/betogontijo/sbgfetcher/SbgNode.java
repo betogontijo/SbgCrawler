@@ -1,16 +1,17 @@
 package br.com.betogontijo.sbgfetcher;
 
-import java.util.HashMap;
 import java.util.Map;
 
-public class SbgNode extends HashMap<String, Object> {
+import br.com.betogontijo.sbgreader.SbgMap;
+
+public class SbgNode extends SbgMap<String, Object> {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -6981076179896761064L;
 
-	Map<String, Object> nextNode = new HashMap<String, Object>();
+	Map<String, Object> nextNode = new SbgMap<String, Object>();
 
 	SbgNode() {
 

@@ -23,15 +23,22 @@ public class SbgSeed {
 		try {
 			path = new URI(seedPath);
 		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			try {
+				if (new File("file://" + seedPath).exists()) {
+					path = new URI("file://" + seedPath);
+				} else {
+					path = new URI("http://" + seedPath);
+				}
+			} catch (URISyntaxException e1) {
+
+			}
 		}
 	}
 
 	OutputStream getOutputStream() throws MalformedURLException, IOException {
 		String scheme = path.getScheme();
 
-		if (scheme.equalsIgnoreCase("http")) {
+		if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) {
 			return path.toURL().openConnection().getOutputStream();
 		}
 		// else if(scheme.equalsIgnoreCase("ftp")){}
@@ -45,11 +52,9 @@ public class SbgSeed {
 	InputStream getInputStream() throws MalformedURLException, IOException {
 		String scheme = path.getScheme();
 
-		if (scheme.equalsIgnoreCase("http")) {
-			return path.toURL().openConnection().getInputStream();
-		}
-		// else if(scheme.equalsIgnoreCase("ftp")){}
-		else if (scheme.equalsIgnoreCase("file")) {
+		if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("ftp")) {
+			return path.toURL().openStream();
+		} else if (scheme.equalsIgnoreCase("file")) {
 			return new FileInputStream(new File(path.getPath()));
 		} else {
 			return null;
