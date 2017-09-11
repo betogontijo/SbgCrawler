@@ -3,11 +3,13 @@ package br.com.betogontijo.sbgreader;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.URISyntaxException;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.IOUtils;
@@ -35,7 +37,11 @@ class SbgCrawler implements Closeable, Runnable {
 	static final String DOMAINS_COLLECTION_NAME = "domain";
 	static final String DOCUMENTS_COLLECTION_NAME = "document";
 
-	private Queue<String> references = new ConcurrentLinkedQueue<String>();
+	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES (?)";
+	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT 1 RETURNING uri";
+	static final String SELECT_COUNT_REFERENCES_QUERY = "SELECT COUNT(1) FROM refs";
+
+	private Connection connection;
 
 	SbgCrawler() {
 		startUpMongoDb();
@@ -46,10 +52,17 @@ class SbgCrawler implements Closeable, Runnable {
 		// Get connection and database
 		mongoClient = new MongoClient("localhost", 27017);
 		MongoDatabase database = mongoClient.getDatabase("SbgDB");
-
 		// Get the driver for both document and domain collections
 		domainDB = database.getCollection(DOMAINS_COLLECTION_NAME, Map.class);
 		documentDB = database.getCollection(DOCUMENTS_COLLECTION_NAME, Map.class);
+		try {
+			Class.forName("org.mariadb.jdbc.Driver");
+			connection = DriverManager.getConnection("jdbc:mariadb://localhost/SbgDB", "root", "123");
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 
 		// Query to search for the last documentID
 		BasicDBObject id = new BasicDBObject();
@@ -98,14 +111,15 @@ class SbgCrawler implements Closeable, Runnable {
 				try {
 					// Parse full path reference uri
 					href = UriUtils.pathToUri(href).toString();
-					getReferences().add(href);
+					insertReference(href);
+					// getReferences().add(href);
 				} catch (Exception e) {
 				}
 			}
 			// Update the db
 			updateDB(domainDB, domainQuery, domain);
 			updateDB(documentDB, sbgDocumentQuery, sbgDocument);
-		} catch (URISyntaxException e1) {
+		} catch (Exception e1) {
 			// Just ignore this exception?
 		}
 	}
@@ -164,14 +178,54 @@ class SbgCrawler implements Closeable, Runnable {
 
 	public void run() {
 		try {
-			crawl(getReferences().remove());
+			crawl(getReference());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public Queue<String> getReferences() {
-		return references;
+	public void insertReference(String reference) {
+
+		try {
+			PreparedStatement prepareStatement = connection.prepareStatement(INSERT_REFERENCE_QUERY);
+			prepareStatement.setString(1, reference);
+			prepareStatement.executeUpdate();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public String getReference() {
+		String reference = "";
+		try {
+			PreparedStatement prepareStatement = connection.prepareStatement(SELECT_AND_REMOVE_REFERENCE_QUERY);
+			ResultSet executeQuery = prepareStatement.executeQuery();
+			if (executeQuery.next()) {
+				reference = executeQuery.getString("uri");
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return reference;
+	}
+
+	public boolean hasReferences() {
+		boolean hasReferences = false;
+		try {
+			PreparedStatement prepareStatement = connection.prepareStatement(SELECT_COUNT_REFERENCES_QUERY);
+			ResultSet executeQuery = prepareStatement.executeQuery();
+			if (executeQuery.next()) {
+				if (executeQuery.getInt(1) > 0) {
+					hasReferences = true;
+				}
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return hasReferences;
 	}
 
 }

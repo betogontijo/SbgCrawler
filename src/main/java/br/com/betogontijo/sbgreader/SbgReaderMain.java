@@ -10,12 +10,13 @@ import java.util.concurrent.Executors;
  *
  */
 public class SbgReaderMain {
+	private static Thread monitor;
+
 	public static void main(String[] args) throws IOException, InterruptedException {
 		final SbgCrawler bfs = new SbgCrawler();
 		performanceMonitor(bfs);
 
-		ExecutorService newFixedThreadPool = Executors.newFixedThreadPool(1);
-//		 newFixedThreadPool.awaitTermination(2, TimeUnit.SECONDS);
+		ExecutorService newFixedThreadPool = Executors.newFixedThreadPool(16);
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < args.length; i++) {
@@ -27,20 +28,22 @@ public class SbgReaderMain {
 			}
 		}
 
-		while (!bfs.getReferences().isEmpty()) {
+		while (bfs.hasReferences()) {
 			try {
-				//FIXME as referencias tem q ficar em disco
+				// FIXME as referencias tem q ficar em disco
 				newFixedThreadPool.execute(bfs);
+				Thread.sleep(200);
 			} catch (Exception e) {
-				// Holds the exception, so the entire machine doesnt
-				// stop.
+				//Should be ignored?
 			}
 		}
 		bfs.close();
+		monitor.interrupt();
 	}
 
 	private static void performanceMonitor(final SbgCrawler bfs) {
-		new Thread() {
+		//Create a thread for monitoring insertions/second
+		monitor = new Thread() {
 			@Override
 			public void run() {
 				Integer atual = bfs.getDocIdCounter();
@@ -57,6 +60,7 @@ public class SbgReaderMain {
 					}
 				}
 			}
-		}.start();
+		};
+		monitor.start();
 	}
 }
