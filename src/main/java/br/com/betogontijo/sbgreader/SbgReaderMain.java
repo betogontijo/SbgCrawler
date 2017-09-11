@@ -2,8 +2,8 @@ package br.com.betogontijo.sbgreader;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Hello world!
@@ -16,7 +16,9 @@ public class SbgReaderMain {
 		final SbgCrawler bfs = new SbgCrawler();
 		performanceMonitor(bfs);
 
-		ExecutorService newFixedThreadPool = Executors.newFixedThreadPool(16);
+		int threadNumber = 16;
+
+		ThreadPoolExecutor newFixedThreadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadNumber);
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < args.length; i++) {
@@ -30,11 +32,11 @@ public class SbgReaderMain {
 
 		while (bfs.hasReferences()) {
 			try {
-				// FIXME as referencias tem q ficar em disco
-				newFixedThreadPool.execute(bfs);
-				Thread.sleep(200);
+				if (newFixedThreadPool.getActiveCount() < threadNumber) {
+					newFixedThreadPool.execute(bfs);
+				}
 			} catch (Exception e) {
-				//Should be ignored?
+				// Should be ignored?
 			}
 		}
 		bfs.close();
@@ -42,7 +44,7 @@ public class SbgReaderMain {
 	}
 
 	private static void performanceMonitor(final SbgCrawler bfs) {
-		//Create a thread for monitoring insertions/second
+		// Create a thread for monitoring insertions/second
 		monitor = new Thread() {
 			@Override
 			public void run() {
