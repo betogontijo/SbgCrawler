@@ -5,10 +5,10 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Date;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
@@ -20,7 +20,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
-class SbgCrawler implements Closeable {
+class SbgCrawler implements Closeable, Runnable {
 
 	MongoClient mongoClient;
 
@@ -30,21 +30,28 @@ class SbgCrawler implements Closeable {
 	@SuppressWarnings("rawtypes")
 	MongoCollection<Map> documentDB;
 
-	private Integer docIdCounter = 1;
+	private AtomicInteger docIdCounter = new AtomicInteger(1);
 
 	static final String DOMAINS_COLLECTION_NAME = "domain";
 	static final String DOCUMENTS_COLLECTION_NAME = "document";
 
+	private Queue<String> references = new ConcurrentLinkedQueue<String>();
+
 	SbgCrawler() {
-		loadCache();
+		startUpMongoDb();
 	}
 
 	@SuppressWarnings("unchecked")
-	private void loadCache() {
+	private void startUpMongoDb() {
+		// Get connection and database
 		mongoClient = new MongoClient("localhost", 27017);
 		MongoDatabase database = mongoClient.getDatabase("SbgDB");
+
+		// Get the driver for both document and domain collections
 		domainDB = database.getCollection(DOMAINS_COLLECTION_NAME, Map.class);
 		documentDB = database.getCollection(DOCUMENTS_COLLECTION_NAME, Map.class);
+
+		// Query to search for the last documentID
 		BasicDBObject id = new BasicDBObject();
 		id.put("_id", -1);
 		Map<String, Object> maxId = documentDB.find().sort(id).first();
@@ -53,55 +60,51 @@ class SbgCrawler implements Closeable {
 		}
 	}
 
-	public void crawl(String uri, String referedBy) throws IOException {
+	public void crawl(String uri) throws IOException {
+		// Query to stored domain
 		Domain domainQuery = new Domain(Domain.getDomain(uri));
+		// Load or create the domain for this document
 		Domain domain = findDomain(domainQuery);
+
+		// Try to retrieve robots.txt from this domain
 		if (domain.getRobotsContent() == null) {
 			domain.setRobotsContent(getRobotsCotent(domain.getUri()));
 		}
+
+		// Check if page is allowed
 		if (!domain.isPageAllowed(uri)) {
 			return;
 		}
+
+		// Query to stored document
 		SbgDocument sbgDocumentQuery = new SbgDocument(uri);
-		SbgDocument sbgDocument = findPage(sbgDocumentQuery);
-		if (sbgDocument.isProcessed()) {
+		// Load or create the document
+		SbgDocument sbgDocument = findPage(sbgDocumentQuery, domain.isLoadedInstance());
+		// Check if still updated
+		if (sbgDocument.isOutDated()) {
 			return;
 		}
 		try {
-			sbgDocument.setLastModified(new Date());
-			if (referedBy != null) {
-				domain.increaseRank(referedBy);
-			}
+			// Retrieve the HTML
 			org.jsoup.nodes.Document doc = Jsoup.parse(IOUtils.toString(sbgDocument.getInputStream()));
 			sbgDocument.setContent(doc.text());
+			sbgDocument.setLastModified(System.currentTimeMillis());
+
+			// Filter references
 			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
 					.not("[hreflang]");
-			Queue<String> references = new LinkedList<String>();
 			for (Element element : links) {
 				String href = element.attr("abs:href").split("\\?")[0];
 				try {
+					// Parse full path reference uri
 					href = UriUtils.pathToUri(href).toString();
-					references.add(href);
+					getReferences().add(href);
 				} catch (Exception e) {
 				}
 			}
+			// Update the db
 			updateDB(domainDB, domainQuery, domain);
 			updateDB(documentDB, sbgDocumentQuery, sbgDocument);
-
-			if (references.isEmpty()) {
-//				System.out.println(uri + " -> Nao ha referencias.");
-			} else {
-//				System.out.println(uri + " -> " + references + ".");
-				while (!references.isEmpty()) {
-					try {
-						crawl(references.remove(), uri);
-					} catch (Exception e) {
-						// Holds the exception, so the entire machine doesnt
-						// stop.
-					}
-				}
-			}
-
 		} catch (URISyntaxException e1) {
 			// Just ignore this exception?
 		}
@@ -115,9 +118,14 @@ class SbgCrawler implements Closeable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private SbgDocument findPage(SbgDocument sbgPage) {
-		Map<String, Object> sbgPageMap = documentDB.find(sbgPage, SbgMap.class).first();
-		SbgDocument nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getPath());
+	private SbgDocument findPage(SbgDocument sbgPage, boolean search) {
+		SbgDocument nextSbgPage = null;
+		if (search) {
+			Map<String, Object> sbgPageMap = documentDB.find(sbgPage, SbgMap.class).first();
+			nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getPath());
+		} else {
+			nextSbgPage = new SbgDocument(sbgPage.getPath());
+		}
 		return nextSbgPage;
 	}
 
@@ -125,7 +133,7 @@ class SbgCrawler implements Closeable {
 	private void updateDB(MongoCollection<Map> collection, SbgMap<String, Object> document,
 			SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
-			nextDocument.put("_id", docIdCounter++);
+			nextDocument.put("_id", docIdCounter.incrementAndGet());
 			collection.insertOne(nextDocument);
 		} else {
 			collection.replaceOne(document, nextDocument);
@@ -146,11 +154,24 @@ class SbgCrawler implements Closeable {
 		mongoClient.close();
 	}
 
-	public Integer getDocIdCounter() {
-		return docIdCounter;
+	public int getDocIdCounter() {
+		return docIdCounter.get();
 	}
 
-	private void setDocIdCounter(Integer docIdCounter) {
-		this.docIdCounter = docIdCounter;
+	private void setDocIdCounter(int docIdCounter) {
+		this.docIdCounter.set(docIdCounter);
 	}
+
+	public void run() {
+		try {
+			crawl(getReferences().remove());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public Queue<String> getReferences() {
+		return references;
+	}
+
 }

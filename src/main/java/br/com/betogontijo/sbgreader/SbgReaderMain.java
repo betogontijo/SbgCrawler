@@ -2,37 +2,41 @@ package br.com.betogontijo.sbgreader;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-
-import br.com.betogontijo.sbgfetcher.SbgFetcher;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Hello world!
  *
  */
-public class App {
-	public static void main(String[] args) throws IOException {
-		// new SbgConsumer();
+public class SbgReaderMain {
+	public static void main(String[] args) throws IOException, InterruptedException {
 		final SbgCrawler bfs = new SbgCrawler();
 		performanceMonitor(bfs);
-		
-		//Loop through arguments used as seeds
+
+		ExecutorService newFixedThreadPool = Executors.newFixedThreadPool(1);
+//		 newFixedThreadPool.awaitTermination(2, TimeUnit.SECONDS);
+
+		// Loop through arguments used as seeds
 		for (int i = 0; i < args.length; i++) {
 			try {
 				String uri = UriUtils.pathToUri(args[i]).toString();
-				bfs.crawl(uri, null);
+				bfs.crawl(uri);
 			} catch (URISyntaxException e) {
 				e.printStackTrace();
 			}
 		}
+
+		while (!bfs.getReferences().isEmpty()) {
+			try {
+				//FIXME as referencias tem q ficar em disco
+				newFixedThreadPool.execute(bfs);
+			} catch (Exception e) {
+				// Holds the exception, so the entire machine doesnt
+				// stop.
+			}
+		}
 		bfs.close();
-		
-		
-		SbgFetcher sbgFetcher = new SbgFetcher();
-		long fetchStart = System.currentTimeMillis();
-		sbgFetcher.fetch();
-		long fetchEnd = System.currentTimeMillis();
-		sbgFetcher.close();
-		System.out.println("Fetching time: " + (fetchEnd - fetchStart) + "ms.");
 	}
 
 	private static void performanceMonitor(final SbgCrawler bfs) {

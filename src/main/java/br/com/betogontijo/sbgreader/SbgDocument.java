@@ -9,7 +9,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -44,20 +43,11 @@ public class SbgDocument extends SbgMap<String, Object> {
 		setPath(uri);
 	}
 
-//	public boolean isOutDated() {
-
-		// long validation = (new Date().getTime() -
-		// getLastModified().getTime()) * (getDomain().getRank() + 1)
-		// / Integer.MAX_VALUE;
-		// if (validation > 1000) {
-		// return true;
-		// }
-//	}
-
-	public boolean isProcessed(){
+	public boolean isOutDated() {
+		// TODO make some logic to how long should a document be updated
 		return getLastModified() != null;
 	}
-	
+
 	public String getPath() {
 		return (String) get("path");
 	}
@@ -66,40 +56,36 @@ public class SbgDocument extends SbgMap<String, Object> {
 		put("path", path);
 	}
 
-	public Date getLastModified() {
-		return (Date) get("lastModified");
+	public Long getLastModified() {
+		return (Long) get("lastModified");
 	}
 
-	public void setLastModified(Date date) {
-		put("lastModified", date);
+	public void setLastModified(long lastModified) {
+		put("lastModified", lastModified);
 	}
 
-	public ChangeFrequency getChangeFrequency() {
-		return (ChangeFrequency) get("changeFrequency");
-	}
-
-	public void setChangeFrequency(ChangeFrequency changeFrequency) {
-		put("changeFrequency", changeFrequency);
-	}
-
+	// Create a map of words with their positions
 	public void setContent(String body) {
 		Map<String, List<Integer>> wordsPos = new SbgMap<String, List<Integer>>();
 		Scanner in = new Scanner(body);
 		int pos = 0;
 		while (in.hasNext()) {
 			String word = removeAccents(in.next());
-			if (wordsPos.get(word) != null) {
-				wordsPos.get(word).add(pos++);
-			} else {
-				List<Integer> positions = new ArrayList<Integer>();
-				positions.add(pos++);
-				wordsPos.put(word, positions);
+			if (!word.isEmpty()) {
+				if (wordsPos.get(word) != null) {
+					wordsPos.get(word).add(pos++);
+				} else {
+					List<Integer> positions = new ArrayList<Integer>();
+					positions.add(pos++);
+					wordsPos.put(word, positions);
+				}
 			}
 		}
 		in.close();
 		put("wordsPos", wordsPos);
 	}
 
+	// get input stream to this document
 	InputStream getInputStream() throws MalformedURLException, IOException, URISyntaxException {
 		URI uri = new URI(getPath());
 		String scheme = uri.getScheme();
@@ -113,7 +99,9 @@ public class SbgDocument extends SbgMap<String, Object> {
 		}
 	}
 
+	// Check if this document has this word (deprecated)
 	@SuppressWarnings("unchecked")
+	@Deprecated
 	public int containsWord(String query) {
 		Map<String, List<Integer>> wordsPos = (Map<String, List<Integer>>) get("wordsPos");
 		String[] words = query.split(" ");
@@ -147,9 +135,9 @@ public class SbgDocument extends SbgMap<String, Object> {
 
 	public static String removeAccents(String string) {
 		if (string != null) {
+			string = string.toLowerCase();
 			string = Normalizer.normalize(string, Normalizer.Form.NFD);
-			string = string.replaceAll("[^A-Za-z0-9\\s]", "");
-			// string = string.replaceAll("[^\\p{ASCII}]", "");
+			string = string.replaceAll("[^a-z0-9\\s]", "");
 		}
 		return string;
 	}

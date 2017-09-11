@@ -2,8 +2,6 @@ package br.com.betogontijo.sbgreader;
 
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import org.bson.types.Binary;
@@ -20,6 +18,7 @@ public class Domain extends SbgMap<String, Object> {
 	// String uri;
 	// List<String> referedBy;
 	// byte[] robotsContent;
+	private boolean loadedInstance = false;
 
 	public Domain(String uri) {
 		init(uri);
@@ -30,6 +29,7 @@ public class Domain extends SbgMap<String, Object> {
 			for (Entry<String, Object> entry : map.entrySet()) {
 				put(entry.getKey(), entry.getValue());
 			}
+			setLoadedInstance(true);
 		} else {
 			init(uri);
 		}
@@ -47,26 +47,7 @@ public class Domain extends SbgMap<String, Object> {
 		put("uri", uri);
 	}
 
-	@SuppressWarnings("unchecked")
-	public List<String> getReferedBy() {
-		return (List<String>) get("referedBy") == null ? new ArrayList<String>() : (List<String>) get("referedBy");
-	}
-
-	public int getRank() {
-		return getReferedBy().size();
-	}
-
-	public boolean increaseRank(String url) {
-		if (!getReferedBy().contains(url)) {
-			try {
-				return getReferedBy().add(getDomain(url));
-			} catch (MalformedURLException e) {
-				return false;
-			}
-		}
-		return false;
-	}
-
+	// Filter uri domain
 	public static String getDomain(String path) throws MalformedURLException {
 		try {
 			URI uri = new URI(path);
@@ -92,5 +73,13 @@ public class Domain extends SbgMap<String, Object> {
 	public boolean isPageAllowed(String page) {
 		return new SimpleRobotRulesParser()
 				.parseContent(getUri(), getRobotsContent(), "text/html; charset=UTF-8", "SbgRobot").isAllowed(page);
+	}
+
+	public boolean isLoadedInstance() {
+		return loadedInstance;
+	}
+
+	public void setLoadedInstance(boolean loadedInstance) {
+		this.loadedInstance = loadedInstance;
 	}
 }
