@@ -14,7 +14,7 @@ import com.mongodb.client.MongoDatabase;
 import com.sun.xml.internal.ws.Closeable;
 
 import br.com.betogontijo.sbgreader.SbgMap;
-import br.com.betogontijo.sbgreader.SbgPage;
+import br.com.betogontijo.sbgreader.SbgDocument;
 
 public class SbgFetcher implements Closeable {
 
@@ -36,6 +36,7 @@ public class SbgFetcher implements Closeable {
 	public void fetch() {
 		Scanner in = new Scanner(System.in);
 		String query = in.nextLine();
+		in.close();
 		List<String> words = new ArrayList<String>();
 		Scanner stream = new Scanner(query);
 		while (stream.hasNext()) {
@@ -45,17 +46,17 @@ public class SbgFetcher implements Closeable {
 					word += " " + stream.next();
 				}
 				word = word.substring(1, word.length() - 1);
-				query = query.replaceFirst("\"", "");
-				query = query.replaceFirst("\"", "");
+				query = query.substring(word.length() + 2, query.length());
 			}
 			words.add(word);
 		}
-
+		stream.close();
+		
 		List<Integer> matches = new ArrayList<Integer>();
 		MongoCursor<SbgMap> iterator = pageDB.find(SbgMap.class).iterator();
 		int i = 0;
 		while (iterator.hasNext()) {
-			SbgPage page = new SbgPage(iterator.next());
+			SbgDocument page = new SbgDocument(iterator.next(), null);
 			matches.add(0);
 			for (int j = 0; j < words.size(); j++) {
 				if (page.containsWord(words.get(j)) > 0) {
@@ -64,8 +65,6 @@ public class SbgFetcher implements Closeable {
 			}
 			System.out.println(page.getPath() + " -> " + matches.get(i++));
 		}
-		in.close();
-		stream.close();
 	}
 
 	public void close() throws WebServiceException {

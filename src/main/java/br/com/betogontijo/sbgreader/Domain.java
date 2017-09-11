@@ -19,26 +19,24 @@ public class Domain extends SbgMap<String, Object> {
 
 	// String uri;
 	// List<String> referedBy;
-	// List<SbgPage> pages;
+	// byte[] robotsContent;
 
 	public Domain(String uri) {
-		setUri(uri);
-		setReferedBy(new ArrayList<String>());
-		setPages(new ArrayList<SbgPage>());
+		init(uri);
 	}
 
-	public Domain(String uri, boolean isSearch) {
-		setUri(uri);
-		if (!isSearch) {
-			setReferedBy(new ArrayList<String>());
-			setPages(new ArrayList<SbgPage>());
+	public Domain(Map<String, Object> map, String uri) {
+		if (map != null) {
+			for (Entry<String, Object> entry : map.entrySet()) {
+				put(entry.getKey(), entry.getValue());
+			}
+		} else {
+			init(uri);
 		}
 	}
 
-	public Domain(Map<String, Object> map) {
-		for (Entry<String, Object> entry : map.entrySet()) {
-			put(entry.getKey(), entry.getValue());
-		}
+	private void init(String uri) {
+		setUri(uri);
 	}
 
 	public String getUri() {
@@ -51,41 +49,13 @@ public class Domain extends SbgMap<String, Object> {
 
 	@SuppressWarnings("unchecked")
 	public List<String> getReferedBy() {
-		return ((List<String>) get("referedBy"));
+		return (List<String>) get("referedBy") == null ? new ArrayList<String>() : (List<String>) get("referedBy");
 	}
-
-	public void setReferedBy(List<String> referedBy) {
-		put("referedBy", referedBy);
-	}
-
-	@SuppressWarnings("unchecked")
-	public List<SbgPage> getPages() {
-		return ((List<SbgPage>) get("pages"));
-	}
-
-	public void setPages(List<SbgPage> pages) {
-		put("pages", pages);
-	}
-
-	// @SuppressWarnings("unchecked")
-	// public Domain(Map<String, Object> domain) {
-	// this.map = domain;
-	// this.url = (String) domain.get("url");
-	// this.referedBy = (ArrayList<String>) domain.get("referedBy");
-	// if (referedBy != null) {
-	// this.referedBy = new ArrayList<String>();
-	// }
-	// this.pages = (List<String>) domain.get("pages");
-	// if (pages == null) {
-	// this.pages = new ArrayList<String>();
-	// }
-	// }
 
 	public int getRank() {
 		return getReferedBy().size();
 	}
 
-	//
 	public boolean increaseRank(String url) {
 		if (!getReferedBy().contains(url)) {
 			try {
@@ -107,26 +77,16 @@ public class Domain extends SbgMap<String, Object> {
 		}
 	}
 
-	public boolean addPage(SbgPage page) {
-		List<SbgPage> listSbgPages = getPages();
-		if (listSbgPages == null) {
-			setPages(new ArrayList<SbgPage>());
-			return getPages().add(page);
-		} else {
-			if (listSbgPages.contains(page)) {
-				return false;
-			} else {
-				return listSbgPages.add(page);
-			}
-		}
-	}
-
 	public void setRobotsContent(byte[] robotsCotent) {
 		put("robots", robotsCotent);
 	}
 
 	public byte[] getRobotsContent() {
-		return ((Binary) get("robots")).getData();
+		try {
+			return ((Binary) get("robots")).getData();
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 	public boolean isPageAllowed(String page) {

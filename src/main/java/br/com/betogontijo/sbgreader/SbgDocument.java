@@ -14,47 +14,50 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-public class SbgPage extends SbgMap<String, Object> {
+public class SbgDocument extends SbgMap<String, Object> {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 8962925156333193044L;
 
-	// Domain domain;
 	// String path;
 	// Date lastModified;
 	// ChangeFrenquency changeFrequency;
 	// String body;
 
-	SbgPage(String uri) {
+	public SbgDocument(String uri) {
+		init(uri);
+	}
+
+	public SbgDocument(Map<String, Object> map, String uri) {
+		if (map != null) {
+			for (Entry<String, Object> entry : map.entrySet()) {
+				put(entry.getKey(), entry.getValue());
+			}
+		} else {
+			init(uri);
+		}
+	}
+
+	private void init(String uri) {
 		setPath(uri);
 	}
 
-	public SbgPage(Map<String, Object> map) {
-		for (Entry<String, Object> entry : map.entrySet()) {
-			put(entry.getKey(), entry.getValue());
-		}
+//	public boolean isOutDated() {
+
+		// long validation = (new Date().getTime() -
+		// getLastModified().getTime()) * (getDomain().getRank() + 1)
+		// / Integer.MAX_VALUE;
+		// if (validation > 1000) {
+		// return true;
+		// }
+//	}
+
+	public boolean isProcessed(){
+		return getLastModified() != null;
 	}
-
-	public boolean isOutDated() {
-
-		long validation = (new Date().getTime() - getLastModified().getTime()) * (getDomain().getRank() + 1)
-				/ Integer.MAX_VALUE;
-		if (validation > 1000) {
-			return true;
-		}
-		return false;
-	}
-
-	public Domain getDomain() {
-		return (Domain) get("domain");
-	}
-
-	public void setDomain(Domain domain) {
-		put("domain", domain);
-	}
-
+	
 	public String getPath() {
 		return (String) get("path");
 	}
@@ -114,48 +117,32 @@ public class SbgPage extends SbgMap<String, Object> {
 	public int containsWord(String query) {
 		Map<String, List<Integer>> wordsPos = (Map<String, List<Integer>>) get("wordsPos");
 		String[] words = query.split(" ");
+		List<Integer> positions = wordsPos.get(words[0]);
 		int queryCount = 0;
-		if (words.length > 1) {
-			System.out.println();
-			for (int i = 1; i < words.length; i++) {
-				List<Integer> positions = wordsPos.get(words[i - 1]);
-				if (positions != null && positions.size() > 0) {
-					int k = 0;
-					int j = 1;
-					List<Integer> nextWordPos = wordsPos.get(words[i]);
-					if (nextWordPos != null && nextWordPos.size() > 0) {
-						while (j <= positions.size() && k < nextWordPos.size()) {
-							if (nextWordPos != null && nextWordPos.size() > 0) {
-								while (positions.get(j - 1) < nextWordPos.get(k) && j < positions.size()) {
-									j++;
-								}
-								while (nextWordPos.get(k) < positions.get(j - 1) && k < nextWordPos.size()) {
-									k++;
-								}
-								if (nextWordPos.get(k) - positions.get(j - 1) == 1) {
-									if (i + 1 == words.length) {
-										queryCount++;
-										j++;
-										k++;
-									}
-								}
-							} else {
-								return queryCount;
-							}
-						}
-					} else {
-						return queryCount;
-					}
-				} else {
-					return queryCount;
-				}
-			}
-		} else {
-			if(wordsPos.get(query) != null && wordsPos.size()>0){
-				queryCount++;
+		if (positions != null) {
+			for (Integer integer : positions) {
+				queryCount += contaisWord(wordsPos, 1, words, integer);
 			}
 		}
 		return queryCount;
+	}
+
+	public int contaisWord(Map<String, List<Integer>> wordsPos, int currentPos, String[] words, int documentPos) {
+		if (currentPos == words.length) {
+			return 1;
+		} else {
+			int matches = 0;
+			List<Integer> positions = wordsPos.get(words[currentPos]);
+			if (positions != null) {
+				currentPos++;
+				for (Integer integer : positions) {
+					if (integer - documentPos == 1) {
+						matches += contaisWord(wordsPos, currentPos, words, integer);
+					}
+				}
+			}
+			return matches;
+		}
 	}
 
 	public static String removeAccents(String string) {

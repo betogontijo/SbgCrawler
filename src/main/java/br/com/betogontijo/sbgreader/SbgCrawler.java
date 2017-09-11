@@ -11,138 +11,124 @@ import java.util.Map;
 import java.util.Queue;
 
 import org.apache.commons.io.IOUtils;
-import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
 class SbgCrawler implements Closeable {
+
 	MongoClient mongoClient;
+
 	@SuppressWarnings("rawtypes")
 	MongoCollection<Map> domainDB;
+
 	@SuppressWarnings("rawtypes")
-	MongoCollection<Map> pageDB;
+	MongoCollection<Map> documentDB;
+
+	private Integer docIdCounter = 1;
+
+	static final String DOMAINS_COLLECTION_NAME = "domain";
+	static final String DOCUMENTS_COLLECTION_NAME = "document";
 
 	SbgCrawler() {
 		loadCache();
 	}
 
+	@SuppressWarnings("unchecked")
 	private void loadCache() {
 		mongoClient = new MongoClient("localhost", 27017);
 		MongoDatabase database = mongoClient.getDatabase("SbgDB");
-		domainDB = database.getCollection("domain", Map.class);
-		pageDB = database.getCollection("page", Map.class);
+		domainDB = database.getCollection(DOMAINS_COLLECTION_NAME, Map.class);
+		documentDB = database.getCollection(DOCUMENTS_COLLECTION_NAME, Map.class);
+		BasicDBObject id = new BasicDBObject();
+		id.put("_id", -1);
+		Map<String, Object> maxId = documentDB.find().sort(id).first();
+		if (maxId != null) {
+			setDocIdCounter((Integer) maxId.get("_id"));
+		}
 	}
 
-	@SuppressWarnings("unchecked")
-	public void crawl(String page) throws IOException {
+	public void crawl(String uri, String referedBy) throws IOException {
+		Domain domainQuery = new Domain(Domain.getDomain(uri));
+		Domain domain = findDomain(domainQuery);
+		if (domain.getRobotsContent() == null) {
+			domain.setRobotsContent(getRobotsCotent(domain.getUri()));
+		}
+		if (!domain.isPageAllowed(uri)) {
+			return;
+		}
+		SbgDocument sbgDocumentQuery = new SbgDocument(uri);
+		SbgDocument sbgDocument = findPage(sbgDocumentQuery);
+		if (sbgDocument.isProcessed()) {
+			return;
+		}
 		try {
-			page = UriUtils.pathToUri(page).toString();
-		} catch (URISyntaxException e2) {
-			return;
-		}
-		String domainUri = Domain.getDomain(page);
-		Domain domain = new Domain(domainUri, true);
-		Map<String, Object> domainMap = domainDB.find(domain, SbgMap.class).first();
-		Domain nextDomain = null;
-		if (domainMap != null) {
-			domainMap.remove("_id");
-			nextDomain = new Domain(domainMap);
-		}
-		if (nextDomain == null) {
-			nextDomain = new Domain(domainUri);
-			nextDomain.setRobotsContent(getRobotsCotent(domainUri));
-		}
-		if (!nextDomain.isPageAllowed(page)) {
-			return;
-		}
-		SbgPage sbgPage = new SbgPage(page);
-		Map<String, Object> sbgPageMap = pageDB.find(sbgPage, SbgMap.class).first();
-		SbgPage nextSbgPage = null;
-		if (sbgPageMap != null) {
-			sbgPageMap.remove("_id");
-			nextSbgPage = new SbgPage(sbgPageMap);
-			nextSbgPage.setDomain(nextDomain);
-			if (!nextSbgPage.isOutDated()) {
-				return;
+			sbgDocument.setLastModified(new Date());
+			if (referedBy != null) {
+				domain.increaseRank(referedBy);
 			}
-		} else {
-			nextSbgPage = sbgPage;
-			nextSbgPage.setLastModified(new Date());
-
-		}
-		nextDomain.addPage(nextSbgPage);
-		try {
-			org.jsoup.nodes.Document doc = Jsoup.parse(IOUtils.toString(nextSbgPage.getInputStream()));
-			nextSbgPage.setContent(doc.text());
-			Elements links = doc.select("[href]:not([href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json)])");
+			org.jsoup.nodes.Document doc = Jsoup.parse(IOUtils.toString(sbgDocument.getInputStream()));
+			sbgDocument.setContent(doc.text());
+			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
+					.not("[hreflang]");
 			Queue<String> references = new LinkedList<String>();
 			for (Element element : links) {
 				String href = element.attr("abs:href").split("\\?")[0];
 				try {
-					String refDomainUrl = Domain.getDomain(href);
-					Domain refDomain = new Domain(refDomainUrl, true);
-					Map<String, Object> refDomainMap = domainDB.find(refDomain, SbgMap.class).first();
-					Domain nextRefDomain = null;
-					if (refDomainMap != null) {
-						refDomainMap.remove("_id");
-						nextRefDomain = new Domain(refDomainMap);
-					}
-					if (nextRefDomain == null) {
-						nextRefDomain = new Domain(refDomainUrl);
-					}
-					nextRefDomain.increaseRank(page);
-					if (refDomainMap == null) {
-						domainDB.insertOne(nextRefDomain);
-					} else {
-						domainDB.replaceOne(refDomain, nextRefDomain);
-					}
+					href = UriUtils.pathToUri(href).toString();
+					references.add(href);
 				} catch (Exception e) {
-					continue;
 				}
-				references.add(href);
 			}
-			if (domainMap == null) {
-				domainDB.insertOne(nextDomain);
-			} else {
-				domainDB.replaceOne(domain, nextDomain);
-			}
-			if (sbgPageMap == null) {
-				pageDB.insertOne(nextSbgPage);
-			} else {
-				pageDB.replaceOne(sbgPage, nextSbgPage);
-			}
+			updateDB(domainDB, domainQuery, domain);
+			updateDB(documentDB, sbgDocumentQuery, sbgDocument);
 
 			if (references.isEmpty()) {
-				System.out.println(page + " -> Nao ha referencias.");
+//				System.out.println(uri + " -> Nao ha referencias.");
 			} else {
-				System.out.println(page + " -> " + references + ".");
+//				System.out.println(uri + " -> " + references + ".");
 				while (!references.isEmpty()) {
-					String next = references.remove();
 					try {
-						crawl(next);
+						crawl(references.remove(), uri);
 					} catch (Exception e) {
+						// Holds the exception, so the entire machine doesnt
+						// stop.
 					}
 				}
 			}
 
-		} catch (HttpStatusException e) {
-			if (domainMap == null) {
-				domainDB.insertOne(nextDomain);
-			} else {
-				domainDB.replaceOne(domain, nextDomain);
-			}
-			if (sbgPageMap == null) {
-				pageDB.insertOne(nextSbgPage);
-			} else {
-				pageDB.replaceOne(sbgPage, nextSbgPage);
-			}
 		} catch (URISyntaxException e1) {
-			e1.printStackTrace();
+			// Just ignore this exception?
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Domain findDomain(Domain domain) {
+		Map<String, Object> domainMap = domainDB.find(domain, SbgMap.class).first();
+		Domain nextDomain = new Domain(domainMap, domain.getUri());
+		return nextDomain;
+	}
+
+	@SuppressWarnings("unchecked")
+	private SbgDocument findPage(SbgDocument sbgPage) {
+		Map<String, Object> sbgPageMap = documentDB.find(sbgPage, SbgMap.class).first();
+		SbgDocument nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getPath());
+		return nextSbgPage;
+	}
+
+	@SuppressWarnings("rawtypes")
+	private void updateDB(MongoCollection<Map> collection, SbgMap<String, Object> document,
+			SbgMap<String, Object> nextDocument) {
+		if (nextDocument.get("_id") == null) {
+			nextDocument.put("_id", docIdCounter++);
+			collection.insertOne(nextDocument);
+		} else {
+			collection.replaceOne(document, nextDocument);
 		}
 	}
 
@@ -152,11 +138,19 @@ class SbgCrawler implements Closeable {
 			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 			return IOUtils.toByteArray(connection.getInputStream());
 		} catch (Exception e) {
-			return new byte[0];
+			return null;
 		}
 	}
 
 	public void close() {
 		mongoClient.close();
+	}
+
+	public Integer getDocIdCounter() {
+		return docIdCounter;
+	}
+
+	private void setDocIdCounter(Integer docIdCounter) {
+		this.docIdCounter = docIdCounter;
 	}
 }
