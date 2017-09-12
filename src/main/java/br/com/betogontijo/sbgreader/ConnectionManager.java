@@ -26,13 +26,9 @@ public class ConnectionManager implements Closeable {
 
 	Properties properties = new Properties();
 
-	ConnectionManager() {
-		try {
-			// Load properties
-			properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	ConnectionManager() throws IOException {
+		// Load properties
+		properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
 	}
 
 	@SuppressWarnings("rawtypes")

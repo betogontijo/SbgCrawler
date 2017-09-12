@@ -26,10 +26,10 @@ public class SbgDataSource {
 	private ConnectionManager connectionFactory;
 
 	@SuppressWarnings("rawtypes")
-	MongoCollection<Map> domainDB;
+	MongoCollection<Map> domainsDb;
 
 	@SuppressWarnings("rawtypes")
-	MongoCollection<Map> documentDB;
+	MongoCollection<Map> documentsDb;
 
 	private Connection mariaDbConnection;
 
@@ -40,28 +40,28 @@ public class SbgDataSource {
 	private static int threads;
 
 	{
-		// Starts connectionFactory
-		connectionFactory = new ConnectionManager();
-
-		// Get the connection for both document and domain collections
-		domainDB = connectionFactory.getDomainsConnection();
-		documentDB = connectionFactory.getDocumentsConnection();
-
-		// Get the connection for references database
-		setMariaDbConnection(connectionFactory.getReferencesConnection());
-
-		// Query to search for the last documentID
-		BasicDBObject id = new BasicDBObject();
-		id.put("_id", -1);
-		@SuppressWarnings("unchecked")
-		Map<String, Object> maxId = documentDB.find().sort(id).first();
-		if (maxId != null) {
-			setDocIdCounter((Integer) maxId.get("_id"));
-		}
-
-		setReferencesBufferQueue(new ConcurrentLinkedQueue<String>());
-		Properties properties = new Properties();
 		try {
+			// Starts connectionFactory
+			connectionFactory = new ConnectionManager();
+
+			// Get the connection for both document and domain collections
+			domainsDb = connectionFactory.getDomainsConnection();
+			documentsDb = connectionFactory.getDocumentsConnection();
+
+			// Get the connection for references database
+			setMariaDbConnection(connectionFactory.getReferencesConnection());
+
+			// Query to search for the last documentID
+			BasicDBObject id = new BasicDBObject();
+			id.put("_id", -1);
+			@SuppressWarnings("unchecked")
+			Map<String, Object> maxId = documentsDb.find().sort(id).first();
+			if (maxId != null) {
+				setDocIdCounter((Integer) maxId.get("_id"));
+			}
+
+			setReferencesBufferQueue(new ConcurrentLinkedQueue<String>());
+			Properties properties = new Properties();
 			properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
 			setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
 			setThreads(Integer.parseInt(properties.getProperty("environment.threads")));
@@ -122,24 +122,24 @@ public class SbgDataSource {
 	public void updateDomainsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
 			nextDocument.put("_id", docIdCounter.incrementAndGet());
-			domainDB.insertOne(nextDocument);
+			domainsDb.insertOne(nextDocument);
 		} else {
-			domainDB.replaceOne(document, nextDocument);
+			domainsDb.replaceOne(document, nextDocument);
 		}
 	}
 
 	public void updateDocumentsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
 			nextDocument.put("_id", docIdCounter.incrementAndGet());
-			documentDB.insertOne(nextDocument);
+			documentsDb.insertOne(nextDocument);
 		} else {
-			documentDB.replaceOne(document, nextDocument);
+			documentsDb.replaceOne(document, nextDocument);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
 	public Domain findDomain(Domain domain) {
-		Map<String, Object> domainMap = domainDB.find(domain, SbgMap.class).first();
+		Map<String, Object> domainMap = domainsDb.find(domain, SbgMap.class).first();
 		Domain nextDomain = new Domain(domainMap, domain.getUri());
 		return nextDomain;
 	}
@@ -148,7 +148,7 @@ public class SbgDataSource {
 	public SbgDocument findDocument(SbgDocument sbgPage, boolean search) {
 		SbgDocument nextSbgPage = null;
 		if (search) {
-			Map<String, Object> sbgPageMap = documentDB.find(sbgPage, SbgMap.class).first();
+			Map<String, Object> sbgPageMap = documentsDb.find(sbgPage, SbgMap.class).first();
 			nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getPath());
 		} else {
 			nextSbgPage = new SbgDocument(sbgPage.getPath());
