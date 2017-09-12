@@ -4,7 +4,7 @@
 
 	<groupId>br.com.betogontijo</groupId>
 	<artifactId>SbgReader</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1</version>
 	<packaging>jar</packaging>
 
 	<name>SbgReader</name>
@@ -63,7 +63,6 @@
 			<artifactId>slf4j-nop</artifactId>
 			<version>1.7.25</version>
 		</dependency>
-
 
 	</dependencies>
 
