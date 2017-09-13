@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -20,7 +20,7 @@ public class Domain extends SbgMap<String, Object> {
 	private static final long serialVersionUID = -8003080503822166581L;
 
 	// String uri;
-	// List<String> referedBy;
+	// List<String> referredBy;
 	// byte[] robotsContent;
 	private boolean loadedInstance = false;
 

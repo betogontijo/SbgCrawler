@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -34,7 +34,7 @@ public class ConnectionManager implements Closeable {
 	 */
 	ConnectionManager() throws IOException {
 		// Load properties
-		properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
+		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 	}
 
 	/**

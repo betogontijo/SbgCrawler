@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,7 +20,7 @@ public class SbgDocument extends SbgMap<String, Object> {
 	 */
 	private static final long serialVersionUID = 8962925156333193044L;
 
-	// String path;
+	// String uri;
 	// Date lastModified;
 	// ChangeFrenquency changeFrequency;
 	// String body;
@@ -50,7 +50,7 @@ public class SbgDocument extends SbgMap<String, Object> {
 	 * @param uri
 	 */
 	private void init(String uri) {
-		setPath(uri);
+		setUri(uri);
 	}
 
 	/**
@@ -64,15 +64,15 @@ public class SbgDocument extends SbgMap<String, Object> {
 	/**
 	 * @return
 	 */
-	public String getPath() {
-		return (String) get("path");
+	public String getUri() {
+		return (String) get("uri");
 	}
 
 	/**
 	 * @param path
 	 */
-	public void setPath(String path) {
-		put("path", path);
+	public void setUri(String path) {
+		put("uri", path);
 	}
 
 	/**
@@ -121,7 +121,7 @@ public class SbgDocument extends SbgMap<String, Object> {
 	 * @throws URISyntaxException
 	 */
 	InputStream getInputStream() throws MalformedURLException, IOException, URISyntaxException {
-		URI uri = new URI(getPath());
+		URI uri = new URI(getUri());
 		String scheme = uri.getScheme();
 
 		if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("ftp")) {

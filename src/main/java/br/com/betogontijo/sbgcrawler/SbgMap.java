@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.io.Serializable;
 import java.util.Collection;

@@ -1,11 +1,11 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 
-public class SbgReaderMain {
+public class SbgCrawlerMain {
 
 	SbgDataSource dataSource = SbgDataSource.getInstance();
 
@@ -15,7 +15,7 @@ public class SbgReaderMain {
 	 * @throws InterruptedException
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		SbgReaderMain reader = new SbgReaderMain();
+		SbgCrawlerMain reader = new SbgCrawlerMain();
 		reader.consume(args);
 	}
 
@@ -29,7 +29,7 @@ public class SbgReaderMain {
 		monitor.start();
 
 		Properties properties = new Properties();
-		properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
+		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
 

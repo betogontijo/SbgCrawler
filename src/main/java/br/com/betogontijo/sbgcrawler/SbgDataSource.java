@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -62,7 +62,7 @@ public class SbgDataSource {
 
 			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
 			Properties properties = new Properties();
-			properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
+			properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 			setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
 			setThreads(Integer.parseInt(properties.getProperty("environment.threads")));
 		} catch (IOException e) {
@@ -199,9 +199,9 @@ public class SbgDataSource {
 		SbgDocument nextSbgPage = null;
 		if (search) {
 			Map<String, Object> sbgPageMap = documentsDb.find(sbgPage, SbgMap.class).first();
-			nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getPath());
+			nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getUri());
 		} else {
-			nextSbgPage = new SbgDocument(sbgPage.getPath());
+			nextSbgPage = new SbgDocument(sbgPage.getUri());
 		}
 		return nextSbgPage;
 	}

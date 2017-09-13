@@ -3,11 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>br.com.betogontijo</groupId>
-	<artifactId>SbgReader</artifactId>
+	<artifactId>SbgCrawler</artifactId>
 	<version>0.1</version>
 	<packaging>jar</packaging>
 
-	<name>SbgReader</name>
+	<name>SbgCrawler</name>
 	<url>http://maven.apache.org</url>
 
 	<properties>
@@ -88,7 +88,7 @@
 						<manifest>
 							<addClasspath>true</addClasspath>
 							<classpathPrefix>lib/</classpathPrefix>
-							<mainClass>br.com.betogontijo.sbgreader.SbgReaderMain</mainClass>
+							<mainClass>br.com.betogontijo.sbgcrawler.SbgCrawlerMain</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

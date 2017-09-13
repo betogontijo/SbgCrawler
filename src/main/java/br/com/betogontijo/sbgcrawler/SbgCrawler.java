@@ -1,4 +1,4 @@
-package br.com.betogontijo.sbgreader;
+package br.com.betogontijo.sbgcrawler;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -57,7 +57,7 @@ public class SbgCrawler implements Runnable {
 		}
 		try {
 			// Retrieve the HTML
-			org.jsoup.nodes.Document doc = Jsoup.parse(sbgDocument.getInputStream(), null, sbgDocument.getPath());
+			org.jsoup.nodes.Document doc = Jsoup.parse(sbgDocument.getInputStream(), null, sbgDocument.getUri());
 			sbgDocument.setContent(doc.text());
 			sbgDocument.setLastModified(System.currentTimeMillis());
 
