@@ -6,12 +6,13 @@ public class PerformanceMonitor extends Thread {
 
 	private volatile boolean running = true;
 
-	PerformanceMonitor() {
-	}
-
+	/* (non-Javadoc)
+	 * @see java.lang.Thread#run()
+	 */
 	@Override
 	public void run() {
-		double speed = 0;
+		double rateSec = 0;
+		double rateMin = 0;
 		while (running) {
 			try {
 				int lastMin = dataSource.getDocIdCounter();
@@ -20,11 +21,12 @@ public class PerformanceMonitor extends Thread {
 					int lastSec = atualSec;
 					Thread.sleep(1000);
 					atualSec = dataSource.getDocIdCounter();
-					speed = ((atualSec - lastSec) + speed) / 2;
-					System.out.printf("\rDocuments/second: %.2f, Queue Buffer Size: %d        ", speed,
-							dataSource.getReferencesBufferQueue().size());
+					rateSec = ((atualSec - lastSec) + rateSec) / 2;
+					System.out.printf(
+							"\rDocuments/second: %.2f, Documents/minute: %.2f, Documents: %d, Queue Buffer Size: %d",
+							rateSec, rateMin, atualSec, dataSource.getReferencesBufferQueue().size());
 				}
-				speed = (atualSec - lastMin) / 60;
+				rateMin = ((atualSec - lastMin) + rateMin) / 61;
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();
@@ -32,6 +34,9 @@ public class PerformanceMonitor extends Thread {
 		}
 	}
 
+	/**
+	 * 
+	 */
 	public void cancel() {
 		running = false;
 	}

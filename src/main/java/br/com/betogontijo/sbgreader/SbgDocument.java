@@ -25,10 +25,17 @@ public class SbgDocument extends SbgMap<String, Object> {
 	// ChangeFrenquency changeFrequency;
 	// String body;
 
+	/**
+	 * @param uri
+	 */
 	public SbgDocument(String uri) {
 		init(uri);
 	}
 
+	/**
+	 * @param map
+	 * @param uri
+	 */
 	public SbgDocument(Map<String, Object> map, String uri) {
 		if (map != null) {
 			for (Entry<String, Object> entry : map.entrySet()) {
@@ -39,32 +46,53 @@ public class SbgDocument extends SbgMap<String, Object> {
 		}
 	}
 
+	/**
+	 * @param uri
+	 */
 	private void init(String uri) {
 		setPath(uri);
 	}
 
+	/**
+	 * @return
+	 */
 	public boolean isOutDated() {
 		// TODO make some logic to how long should a document be updated
 		return getLastModified() != null;
 	}
 
+	/**
+	 * @return
+	 */
 	public String getPath() {
 		return (String) get("path");
 	}
 
+	/**
+	 * @param path
+	 */
 	public void setPath(String path) {
 		put("path", path);
 	}
 
+	/**
+	 * @return
+	 */
 	public Long getLastModified() {
 		return (Long) get("lastModified");
 	}
 
+	/**
+	 * @param lastModified
+	 */
 	public void setLastModified(long lastModified) {
 		put("lastModified", lastModified);
 	}
 
 	// Create a map of words with their positions
+	/**
+	 * @param body
+	 */
 	public void setContent(String body) {
 		Map<String, List<Integer>> wordsPos = new SbgMap<String, List<Integer>>();
 		Scanner in = new Scanner(body);
@@ -86,6 +114,12 @@ public class SbgDocument extends SbgMap<String, Object> {
 	}
 
 	// get input stream to this document
+	/**
+	 * @return
+	 * @throws MalformedURLException
+	 * @throws IOException
+	 * @throws URISyntaxException
+	 */
 	InputStream getInputStream() throws MalformedURLException, IOException, URISyntaxException {
 		URI uri = new URI(getPath());
 		String scheme = uri.getScheme();
@@ -100,8 +134,11 @@ public class SbgDocument extends SbgMap<String, Object> {
 	}
 
 	// Check if this document has this word (deprecated)
+	/**
+	 * @param query
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
-	@Deprecated
 	public int containsWord(String query) {
 		Map<String, List<Integer>> wordsPos = (Map<String, List<Integer>>) get("wordsPos");
 		String[] words = query.split(" ");
@@ -115,6 +152,13 @@ public class SbgDocument extends SbgMap<String, Object> {
 		return queryCount;
 	}
 
+	/**
+	 * @param wordsPos
+	 * @param currentPos
+	 * @param words
+	 * @param documentPos
+	 * @return
+	 */
 	public int contaisWord(Map<String, List<Integer>> wordsPos, int currentPos, String[] words, int documentPos) {
 		if (currentPos == words.length) {
 			return 1;
@@ -133,6 +177,10 @@ public class SbgDocument extends SbgMap<String, Object> {
 		}
 	}
 
+	/**
+	 * @param string
+	 * @return
+	 */
 	public static String removeAccents(String string) {
 		if (string != null) {
 			string = string.toLowerCase();

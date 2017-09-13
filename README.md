@@ -5,5 +5,5 @@ Step 3 - Create table on mariaDB:
 {
 create database SbgDB;
 use SbgDB;
-create table refs (uri varchar(255));
+create table refs (uri varchar(511) unique);
 }

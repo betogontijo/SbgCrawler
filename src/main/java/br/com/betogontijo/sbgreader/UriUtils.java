@@ -9,6 +9,13 @@ import java.net.URISyntaxException;
 import java.net.URL;
 
 public final class UriUtils {
+	/**
+	 * @param path
+	 * @return
+	 * @throws URISyntaxException
+	 * @throws MalformedURLException
+	 * @throws IOException
+	 */
 	public static URI pathToUri(String path) throws URISyntaxException, MalformedURLException, IOException {
 		URI uri = null;
 		if (path.startsWith("file:") || path.startsWith("http:") || path.startsWith("https:")) {

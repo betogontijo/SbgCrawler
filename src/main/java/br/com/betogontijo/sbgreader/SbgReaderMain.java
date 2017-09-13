@@ -9,16 +9,24 @@ public class SbgReaderMain {
 
 	SbgDataSource dataSource = SbgDataSource.getInstance();
 
+	/**
+	 * @param args
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
 		SbgReaderMain reader = new SbgReaderMain();
 		reader.consume(args);
 	}
 
+	/**
+	 * @param seeds
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
 	void consume(String[] seeds) throws IOException, InterruptedException {
 		PerformanceMonitor monitor = new PerformanceMonitor();
 		monitor.start();
-
-		final SbgCrawler crawler = new SbgCrawler();
 
 		Properties properties = new Properties();
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
@@ -26,6 +34,8 @@ public class SbgReaderMain {
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
 
 		ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadNumber);
+
+		final SbgCrawler crawler = new SbgCrawler();
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {

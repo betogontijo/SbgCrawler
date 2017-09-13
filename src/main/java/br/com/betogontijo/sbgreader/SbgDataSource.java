@@ -6,11 +6,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.mongodb.BasicDBObject;
@@ -60,7 +60,7 @@ public class SbgDataSource {
 				setDocIdCounter((Integer) maxId.get("_id"));
 			}
 
-			setReferencesBufferQueue(new ConcurrentLinkedQueue<String>());
+			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
 			Properties properties = new Properties();
 			properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
 			setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
@@ -72,6 +72,9 @@ public class SbgDataSource {
 
 	static SbgDataSource dataSource;
 
+	/**
+	 * @return
+	 */
 	public static SbgDataSource getInstance() {
 		if (dataSource == null) {
 			dataSource = new SbgDataSource();
@@ -79,46 +82,80 @@ public class SbgDataSource {
 		return dataSource;
 	}
 
+	/**
+	 * @return
+	 */
 	private Connection getMariaDbConnection() {
 		return mariaDbConnection;
 	}
 
+	/**
+	 * @param mariaDbConnection
+	 */
 	private void setMariaDbConnection(Connection mariaDbConnection) {
 		this.mariaDbConnection = mariaDbConnection;
 	}
 
+	/**
+	 * @return
+	 */
 	public Queue<String> getReferencesBufferQueue() {
 		return referencesBufferQueue;
 	}
 
+	/**
+	 * @param referencesBufferQueue
+	 */
 	private void setReferencesBufferQueue(Queue<String> referencesBufferQueue) {
 		this.referencesBufferQueue = referencesBufferQueue;
 	}
 
+	/**
+	 * @return
+	 */
 	private static int getBufferSize() {
 		return bufferSize;
 	}
 
+	/**
+	 * @param bufferSize
+	 */
 	private static void setBufferSize(int bufferSize) {
 		SbgDataSource.bufferSize = bufferSize;
 	}
 
+	/**
+	 * @return
+	 */
 	private static int getThreads() {
 		return threads;
 	}
 
+	/**
+	 * @param threads
+	 */
 	private static void setThreads(int threads) {
 		SbgDataSource.threads = threads;
 	}
 
+	/**
+	 * @return
+	 */
 	public int getDocIdCounter() {
 		return docIdCounter.get();
 	}
 
+	/**
+	 * @param docIdCounter
+	 */
 	private void setDocIdCounter(int docIdCounter) {
 		this.docIdCounter.set(docIdCounter);
 	}
 
+	/**
+	 * @param document
+	 * @param nextDocument
+	 */
 	public void updateDomainsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
 			nextDocument.put("_id", docIdCounter.incrementAndGet());
@@ -128,6 +165,10 @@ public class SbgDataSource {
 		}
 	}
 
+	/**
+	 * @param document
+	 * @param nextDocument
+	 */
 	public void updateDocumentsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
 			nextDocument.put("_id", docIdCounter.incrementAndGet());
@@ -137,6 +178,10 @@ public class SbgDataSource {
 		}
 	}
 
+	/**
+	 * @param domain
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public Domain findDomain(Domain domain) {
 		Map<String, Object> domainMap = domainsDb.find(domain, SbgMap.class).first();
@@ -144,6 +189,11 @@ public class SbgDataSource {
 		return nextDomain;
 	}
 
+	/**
+	 * @param sbgPage
+	 * @param search
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public SbgDocument findDocument(SbgDocument sbgPage, boolean search) {
 		SbgDocument nextSbgPage = null;
@@ -156,21 +206,30 @@ public class SbgDataSource {
 		return nextSbgPage;
 	}
 
+	/**
+	 * @return
+	 */
 	public int increaseAndGetDocumentId() {
 		return docIdCounter.incrementAndGet();
 	}
 
+	/**
+	 * @return
+	 */
 	private int getBufferPerThread() {
 		return getBufferSize() / getThreads() * 2;
 	}
 
-	public void insertReference(String reference) {
-		getReferencesBufferQueue().add(reference);
+	/**
+	 * @param reference
+	 */
+	public void insertReference(List<String> reference) {
+		getReferencesBufferQueue().addAll((reference));
 		if (getReferencesBufferQueue().size() > getBufferSize()) {
 			int n = getBufferPerThread();
 			if (n > 0) {
 				try {
-					Statement createStatement = mariaDbConnection.createStatement();
+					Statement createStatement = getMariaDbConnection().createStatement();
 					while (n > 0) {
 						StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
 						for (int i = 1024000; builder.length() < i && n > 0; n--) {
@@ -191,6 +250,9 @@ public class SbgDataSource {
 		}
 	}
 
+	/**
+	 * @return
+	 */
 	public String getReference() {
 		// When reaches size of the buffer is time to fill it again
 		if (getReferencesBufferQueue().size() < getBufferPerThread()) {
@@ -214,6 +276,9 @@ public class SbgDataSource {
 		}
 	}
 
+	/**
+	 * @return
+	 */
 	public boolean hasReferences() {
 		if (getReferencesBufferQueue().size() == 0) {
 			String ref = getReference();

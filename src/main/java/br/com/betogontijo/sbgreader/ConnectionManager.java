@@ -26,11 +26,23 @@ public class ConnectionManager implements Closeable {
 
 	Properties properties = new Properties();
 
+	/**
+	 * @throws IOException
+	 */
+	/**
+	 * @throws IOException
+	 */
 	ConnectionManager() throws IOException {
 		// Load properties
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgreader.properties"));
 	}
 
+	/**
+	 * @return
+	 */
+	/**
+	 * @return
+	 */
 	@SuppressWarnings("rawtypes")
 	public MongoCollection<Map> getDomainsConnection() {
 		if (domainsDB != null) {
@@ -44,6 +56,12 @@ public class ConnectionManager implements Closeable {
 		return domainsDB;
 	}
 
+	/**
+	 * @return
+	 */
+	/**
+	 * @return
+	 */
 	@SuppressWarnings("rawtypes")
 	public MongoCollection<Map> getDocumentsConnection() {
 		if (documentsDB != null) {
@@ -57,6 +75,12 @@ public class ConnectionManager implements Closeable {
 		return documentsDB;
 	}
 
+	/**
+	 * @return
+	 */
+	/**
+	 * @return
+	 */
 	public Connection getReferencesConnection() {
 		if (mariaDbConnection != null) {
 			return mariaDbConnection;
@@ -84,6 +108,12 @@ public class ConnectionManager implements Closeable {
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see java.io.Closeable#close()
+	 */
+	/* (non-Javadoc)
+	 * @see java.io.Closeable#close()
+	 */
 	public void close() {
 		try {
 			mongoClient.close();
