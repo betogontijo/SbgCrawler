@@ -15,8 +15,8 @@ public class SbgCrawlerMain {
 	 * @throws InterruptedException
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		SbgCrawlerMain reader = new SbgCrawlerMain();
-		reader.consume(args);
+		SbgCrawlerMain crawler = new SbgCrawlerMain();
+		crawler.consume(args);
 	}
 
 	/**
