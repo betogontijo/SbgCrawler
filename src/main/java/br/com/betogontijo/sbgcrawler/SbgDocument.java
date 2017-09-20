@@ -110,7 +110,12 @@ public class SbgDocument extends SbgMap<String, Object> {
 			}
 		}
 		in.close();
-		put("wordsPos", wordsPos);
+		put("wordMap", wordsPos);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public Map<String, List<Integer>> getWordMap(){
+		return (Map<String, List<Integer>>) get("wordMap");
 	}
 
 	// get input stream to this document

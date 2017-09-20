@@ -1,6 +1,8 @@
 package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -37,15 +39,18 @@ public class SbgCrawlerMain {
 
 		final SbgCrawler crawler = new SbgCrawler();
 
+		List<String> seedsReferences = new ArrayList<String>();
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
 				String uri = UriUtils.pathToUri(seeds[i]).toString();
-				crawler.crawl(uri);
+				seedsReferences.add(uri);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
+
+		dataSource.insertReference(seedsReferences);
 
 		while (dataSource.hasReferences()) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {

@@ -13,7 +13,6 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
 
 public class SbgDataSource {
@@ -21,9 +20,10 @@ public class SbgDataSource {
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
-	private AtomicInteger docIdCounter = new AtomicInteger(1);
+	private AtomicInteger documentIdCounter = new AtomicInteger();
+	private AtomicInteger domainIdCounter = new AtomicInteger();
 
-	private ConnectionManager connectionFactory;
+	private ConnectionManager connectionManager;
 
 	@SuppressWarnings("rawtypes")
 	MongoCollection<Map> domainsDb;
@@ -42,23 +42,19 @@ public class SbgDataSource {
 	{
 		try {
 			// Starts connectionFactory
-			connectionFactory = new ConnectionManager();
+			connectionManager = new ConnectionManager();
 
 			// Get the connection for both document and domain collections
-			domainsDb = connectionFactory.getDomainsConnection();
-			documentsDb = connectionFactory.getDocumentsConnection();
+			domainsDb = connectionManager.getDomainsConnection();
+			documentsDb = connectionManager.getDocumentsConnection();
 
 			// Get the connection for references database
-			setMariaDbConnection(connectionFactory.getReferencesConnection());
+			setMariaDbConnection(connectionManager.getReferencesConnection());
 
 			// Query to search for the last documentID
-			BasicDBObject id = new BasicDBObject();
-			id.put("_id", -1);
-			@SuppressWarnings("unchecked")
-			Map<String, Object> maxId = documentsDb.find().sort(id).first();
-			if (maxId != null) {
-				setDocIdCounter((Integer) maxId.get("_id"));
-			}
+			documentIdCounter.set((int) documentsDb.count());
+
+			domainIdCounter.set((int) domainsDb.count());
 
 			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
 			Properties properties = new Properties();
@@ -142,26 +138,19 @@ public class SbgDataSource {
 	 * @return
 	 */
 	public int getDocIdCounter() {
-		return docIdCounter.get();
-	}
-
-	/**
-	 * @param docIdCounter
-	 */
-	private void setDocIdCounter(int docIdCounter) {
-		this.docIdCounter.set(docIdCounter);
+		return documentIdCounter.get();
 	}
 
 	/**
 	 * @param document
 	 * @param nextDocument
 	 */
-	public void updateDomainsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
-		if (nextDocument.get("_id") == null) {
-			nextDocument.put("_id", docIdCounter.incrementAndGet());
-			domainsDb.insertOne(nextDocument);
+	public void updateDomainsDb(SbgMap<String, Object> domain, SbgMap<String, Object> nextDomain) {
+		if (nextDomain.get("_id") == null) {
+			nextDomain.put("_id", domainIdCounter.incrementAndGet());
+			domainsDb.insertOne(nextDomain);
 		} else {
-			domainsDb.replaceOne(document, nextDocument);
+			domainsDb.replaceOne(domain, nextDomain);
 		}
 	}
 
@@ -171,7 +160,7 @@ public class SbgDataSource {
 	 */
 	public void updateDocumentsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
 		if (nextDocument.get("_id") == null) {
-			nextDocument.put("_id", docIdCounter.incrementAndGet());
+			nextDocument.put("_id", documentIdCounter.incrementAndGet());
 			documentsDb.insertOne(nextDocument);
 		} else {
 			documentsDb.replaceOne(document, nextDocument);
@@ -204,13 +193,6 @@ public class SbgDataSource {
 			nextSbgPage = new SbgDocument(sbgPage.getUri());
 		}
 		return nextSbgPage;
-	}
-
-	/**
-	 * @return
-	 */
-	public int increaseAndGetDocumentId() {
-		return docIdCounter.incrementAndGet();
 	}
 
 	/**
