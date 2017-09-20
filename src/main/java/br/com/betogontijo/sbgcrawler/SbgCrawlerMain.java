@@ -1,8 +1,6 @@
 package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -26,6 +24,7 @@ public class SbgCrawlerMain {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
+	@SuppressWarnings("deprecation")
 	void consume(String[] seeds) throws IOException, InterruptedException {
 		PerformanceMonitor monitor = new PerformanceMonitor();
 		monitor.start();
@@ -39,27 +38,22 @@ public class SbgCrawlerMain {
 
 		final SbgCrawler crawler = new SbgCrawler();
 
-		List<String> seedsReferences = new ArrayList<String>();
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
 				String uri = UriUtils.pathToUri(seeds[i]).toString();
-				seedsReferences.add(uri);
+				crawler.crawl(uri);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-
-		dataSource.insertReference(seedsReferences);
 
 		while (dataSource.hasReferences()) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {
 				threadPoolExecutor.execute(crawler);
 			}
 		}
-		while (!threadPoolExecutor.isShutdown()) {
-			monitor.cancel();
-			Thread.sleep(10000);
-		}
+		threadPoolExecutor.shutdown();
+		monitor.stop();
 	}
 }

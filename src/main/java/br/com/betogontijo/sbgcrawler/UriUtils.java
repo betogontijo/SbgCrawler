@@ -18,7 +18,7 @@ public final class UriUtils {
 	 */
 	public static URI pathToUri(String path) throws URISyntaxException, MalformedURLException, IOException {
 		URI uri = null;
-		if (path.startsWith("file:") || path.startsWith("http:") || path.startsWith("https:")) {
+		if (path.startsWith("file://") || path.startsWith("http://") || path.startsWith("https://")) {
 			uri = new URI(path);
 		} else if (new File(path).exists()) {
 			path = path.replace("\\", "/");
@@ -28,6 +28,12 @@ public final class UriUtils {
 			huc.setRequestMethod("HEAD");
 			if (huc.getResponseCode() == HttpURLConnection.HTTP_OK) {
 				uri = new URI(huc.getURL().toString());
+			} else {
+				huc = (HttpURLConnection) new URL("https://" + path).openConnection();
+				huc.setRequestMethod("HEAD");
+				if (huc.getResponseCode() == HttpURLConnection.HTTP_OK) {
+					uri = new URI(huc.getURL().toString());
+				}
 			}
 		}
 		return uri;

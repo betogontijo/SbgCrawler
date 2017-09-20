@@ -51,9 +51,8 @@ public class SbgDataSource {
 			// Get the connection for references database
 			setMariaDbConnection(connectionManager.getReferencesConnection());
 
-			// Query to search for the last documentID
+			// Get last document and domain ID
 			documentIdCounter.set((int) documentsDb.count());
-
 			domainIdCounter.set((int) domainsDb.count());
 
 			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
