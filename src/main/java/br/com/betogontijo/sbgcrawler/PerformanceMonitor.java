@@ -14,22 +14,17 @@ public class PerformanceMonitor extends Thread {
 	@Override
 	public void run() {
 		double rate = 0;
-		double topTps = 0;
+		double currentTime = 0;
+		int initialSize = dataSource.getDocIdCounter();
+		int atualSize = initialSize;
 		while (running) {
 			try {
-				int lastMin = dataSource.getDocIdCounter();
-				int atualSec = lastMin;
-				for (int i = 0; i < 60; i++) {
-					int lastSec = atualSec;
-					Thread.sleep(1000);
-					atualSec = dataSource.getDocIdCounter();
-					rate = ((atualSec - lastSec) + rate) / 2;
-					if (rate > topTps) {
-						topTps = rate;
-					}
-					System.out.printf("Rate: %.2fDoc/s, MaxRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\r", rate,
-							topTps, atualSec, dataSource.getReferencesBufferQueue().size());
-				}
+				Thread.sleep(1000);
+				currentTime++;
+				atualSize = dataSource.getDocIdCounter();
+				rate = (atualSize - initialSize) / currentTime;
+				System.out.printf("Rate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\r", rate, atualSize,
+						dataSource.getReferencesBufferQueue().size());
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();

@@ -236,7 +236,7 @@ public class SbgDataSource {
 	 */
 	public String getReference() {
 		// When reaches size of the buffer is time to fill it again
-		if (getReferencesBufferQueue().size() < getBufferPerThread()) {
+		if (documentIdCounter.get() > getBufferSize() && getReferencesBufferQueue().size() < getBufferPerThread()) {
 			try {
 				PreparedStatement prepareStatement = getMariaDbConnection()
 						.prepareStatement(SELECT_AND_REMOVE_REFERENCE_QUERY);
