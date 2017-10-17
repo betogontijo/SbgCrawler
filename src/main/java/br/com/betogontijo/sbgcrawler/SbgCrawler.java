@@ -16,6 +16,8 @@ import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
@@ -25,9 +27,12 @@ import crawlercommons.robots.SimpleRobotRulesParser;
  * @author BETO
  *
  */
+@Service
 public class SbgCrawler implements Runnable {
 
-	private SbgDataSource dataSource = SbgDataSource.getInstance();
+	@Autowired
+	private SbgDataSource dataSource;
+	
 	private static final byte[] ROBOTS_NULL = new byte[1];
 
 	/**

@@ -1,8 +1,13 @@
 package br.com.betogontijo.sbgcrawler;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
 public class PerformanceMonitor extends Thread {
 
-	SbgDataSource dataSource = SbgDataSource.getInstance();
+	@Autowired
+	SbgDataSource dataSource;
 
 	private volatile boolean running = true;
 

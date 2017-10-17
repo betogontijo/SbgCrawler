@@ -2,12 +2,28 @@ package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
 import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
+
+@SpringBootApplication
 public class SbgCrawlerMain {
 
-	SbgDataSource dataSource = SbgDataSource.getInstance();
+	@Autowired
+	SbgDataSource dataSource;
+
+	@Autowired
+	PerformanceMonitor monitor;
+
+	@Autowired
+	SbgThreadPoolExecutor threadPoolExecutor;
+
+	@Autowired
+	SbgCrawler crawler;
 
 	/**
 	 * @param args
@@ -15,8 +31,15 @@ public class SbgCrawlerMain {
 	 * @throws InterruptedException
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		SbgCrawlerMain crawler = new SbgCrawlerMain();
-		crawler.consume(args);
+		SpringApplication.run(SbgCrawlerMain.class, args);
+	}
+
+	@Bean
+	CommandLineRunner init(ConfigurableApplicationContext applitcationContext) {
+		return args -> {
+			consume(args);
+		};
+
 	}
 
 	/**
@@ -26,17 +49,12 @@ public class SbgCrawlerMain {
 	 */
 	@SuppressWarnings("deprecation")
 	void consume(String[] seeds) throws IOException, InterruptedException {
-		PerformanceMonitor monitor = new PerformanceMonitor();
 		monitor.start();
 
 		Properties properties = new Properties();
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
-
-		ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadNumber);
-
-		final SbgCrawler crawler = new SbgCrawler();
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {

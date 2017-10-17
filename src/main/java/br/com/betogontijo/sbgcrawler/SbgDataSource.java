@@ -13,10 +13,10 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import org.springframework.stereotype.Service;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
@@ -50,9 +50,9 @@ import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 //	}
 //}
 
-@SpringBootApplication
-@EnableAutoConfiguration
-@EnableMongoRepositories(basePackages = "br.com.betogontijo.sbgbeans.crawler")
+@Service
+@ComponentScan({ "br.com.betogontijo.sbgbeans.crawler" })
+@EnableMongoRepositories("br.com.betogontijo.sbgbeans.crawler.repositories")
 public class SbgDataSource {
 
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
