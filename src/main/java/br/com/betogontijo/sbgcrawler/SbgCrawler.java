@@ -1,15 +1,25 @@
 package br.com.betogontijo.sbgcrawler;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
-import org.bson.types.Binary;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
+import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
+import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
  * @author BETO
@@ -18,21 +28,23 @@ import org.jsoup.select.Elements;
 public class SbgCrawler implements Runnable {
 
 	private SbgDataSource dataSource = SbgDataSource.getInstance();
-	private static final Binary ROBOTS_NULL = new Binary(new byte[1]);
+	private static final byte[] ROBOTS_NULL = new byte[1];
 
 	/**
 	 * @param uri
 	 * @throws Exception
 	 */
 	public void crawl(String uri) throws Exception {
-		// Query to stored domain
-		Domain domainQuery = new Domain(Domain.getDomain(uri));
 		// Load or create the domain for this document
-		Domain domain = dataSource.findDomain(domainQuery);
+		Domain domain = dataSource.findDomain(getDomain(uri));
+		if (domain == null) {
+			domain = new Domain();
+			domain.setUri(getDomain(uri));
+		}
 
 		// Try to retrieve robots.txt from this domain
 		if (domain.getRobotsContent() == null && domain.getRobotsContent() != ROBOTS_NULL) {
-			Binary robotsCotent = getRobotsCotent(domain.getUri());
+			byte[] robotsCotent = getRobotsCotent(domain.getUri());
 			if (robotsCotent == null) {
 				domain.setRobotsContent(ROBOTS_NULL);
 			} else {
@@ -41,24 +53,26 @@ public class SbgCrawler implements Runnable {
 		}
 
 		// Check if page is allowed
-		if (!domain.isPageAllowed(uri)) {
+		if (!isPageAllowed(domain, uri)) {
 			return;
 		}
-
-		// Query to stored document
-		SbgDocument sbgDocumentQuery = new SbgDocument(uri);
 		// Load if the domain was loaded from db.
 		// Otherwise create it.
 		// If the domain wasnt loaded we can assure that document wasnt either.
-		SbgDocument sbgDocument = dataSource.findDocument(sbgDocumentQuery, domain.isLoadedInstance());
+		SbgDocument sbgDocument = dataSource.findDocument(uri);
+		if (sbgDocument == null) {
+			sbgDocument = new SbgDocument();
+			sbgDocument.setUri(uri);
+		}
 		// Check if still updated
 		if (sbgDocument.isOutDated()) {
 			return;
 		}
 		try {
 			// Retrieve the HTML
-			org.jsoup.nodes.Document doc = Jsoup.parse(sbgDocument.getInputStream(), null, sbgDocument.getUri());
-			sbgDocument.setContent(doc.text());
+			org.jsoup.nodes.Document doc = Jsoup.parse(getInputStream(sbgDocument.getUri()), null,
+					sbgDocument.getUri());
+			sbgDocument.setBody(doc.text());
 			sbgDocument.setLastModified(System.currentTimeMillis());
 
 			// Filter references
@@ -76,9 +90,33 @@ public class SbgCrawler implements Runnable {
 			}
 			dataSource.insertReference(references);
 			// Update the db
-			dataSource.updateDomainsDb(domainQuery, domain);
-			dataSource.updateDocumentsDb(sbgDocumentQuery, sbgDocument);
+			dataSource.updateDomainsDb(domain);
+			dataSource.updateDocumentsDb(sbgDocument);
 		} catch (Exception e1) {
+		}
+	}
+
+	private String getDomain(String path) {
+		try {
+			URI uri = new URI(path);
+			String domain = uri.getHost();
+			return domain.startsWith("www.") ? domain.substring(4) : domain;
+		} catch (Exception e) {
+			return path;
+		}
+	}
+
+	public static InputStream getInputStream(String uriPath)
+			throws MalformedURLException, IOException, URISyntaxException {
+		URI uri = new URI(uriPath);
+		String scheme = uri.getScheme();
+
+		if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("ftp")) {
+			return uri.toURL().openStream();
+		} else if (scheme.equalsIgnoreCase("file")) {
+			return new FileInputStream(new File(uri.getPath()));
+		} else {
+			return null;
 		}
 	}
 
@@ -86,14 +124,20 @@ public class SbgCrawler implements Runnable {
 	 * @param domainUrl
 	 * @return
 	 */
-	private Binary getRobotsCotent(String domainUrl) {
+	private byte[] getRobotsCotent(String domainUrl) {
 		try {
 			URL url = new URL("http://" + domainUrl + "/robots.txt");
 			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-			return new Binary(IOUtils.toByteArray(connection.getInputStream()));
+			return IOUtils.toByteArray(connection.getInputStream());
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	public boolean isPageAllowed(Domain domain, String page) {
+		return new SimpleRobotRulesParser()
+				.parseContent(domain.getUri(), domain.getRobotsContent(), "text/html; charset=UTF-8", "SbgRobot")
+				.isAllowed(page);
 	}
 
 	/*

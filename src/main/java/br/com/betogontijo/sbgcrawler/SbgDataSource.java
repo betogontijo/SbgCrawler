@@ -7,29 +7,61 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
-import com.mongodb.client.MongoCollection;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
+import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
+import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
+import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
+import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
+
+//@SpringBootApplication
+//public class SbgBeansApplication {
+//	public static void main(String[] args) {
+//		SpringApplication.run(SbgBeansApplication.class, args);
+//	}
+//
+//	@Bean
+//	CommandLineRunner init(NodeRepository domainRepository) {
+//		return args -> {
+//			Node obj = domainRepository.findByPrefix("batata");
+//			System.out.println(obj);
+//
+//			InvertedList invertedList = new InvertedList();
+//			List<Integer> docRefList = new ArrayList<Integer>();
+//			docRefList.add(1);
+//			invertedList.setDocRefList(docRefList);
+//			List<int[]> occurrencesList = new ArrayList<int[]>();
+//			occurrencesList.add(new int[1]);
+//			invertedList.setOccurrencesList(occurrencesList);
+//
+//			int n = domainRepository.upsertNode("batata", invertedList, new HashMap<Character, Node>());
+//			System.out.println("Number of records updated : " + n);
+//		};
+//
+//	}
+//}
+
+@SpringBootApplication
+@EnableAutoConfiguration
+@EnableMongoRepositories(basePackages = "br.com.betogontijo.sbgbeans.crawler")
 public class SbgDataSource {
 
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
-	private AtomicInteger documentIdCounter = new AtomicInteger();
-	private AtomicInteger domainIdCounter = new AtomicInteger();
+	private AtomicLong documentIdCounter = new AtomicLong();
+	private AtomicLong domainIdCounter = new AtomicLong();
 
 	private ConnectionManager connectionManager;
-
-	@SuppressWarnings("rawtypes")
-	MongoCollection<Map> domainsDb;
-
-	@SuppressWarnings("rawtypes")
-	MongoCollection<Map> documentsDb;
 
 	private Connection mariaDbConnection;
 
@@ -39,21 +71,36 @@ public class SbgDataSource {
 
 	private static int threads;
 
+	@Autowired
+	MongoTemplate mongoTemplate;
+
+	@Autowired
+	SbgDocumentRepository documentRepository;
+
+	@Autowired
+	DomainRepository domainRepository;
+
 	{
 		try {
 			// Starts connectionFactory
 			connectionManager = new ConnectionManager();
 
-			// Get the connection for both document and domain collections
-			domainsDb = connectionManager.getDomainsConnection();
-			documentsDb = connectionManager.getDocumentsConnection();
-
 			// Get the connection for references database
 			setMariaDbConnection(connectionManager.getReferencesConnection());
 
 			// Get last document and domain ID
-			documentIdCounter.set((int) documentsDb.count());
-			domainIdCounter.set((int) domainsDb.count());
+			Long documentCount = 0L;
+			try {
+				documentCount = documentRepository.count();
+			} catch (NullPointerException e) {
+			}
+			documentIdCounter.set(documentCount);
+			Long domainCount = 0L;
+			try {
+				domainCount = domainRepository.count();
+			} catch (NullPointerException e) {
+			}
+			domainIdCounter.set(domainCount);
 
 			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
 			Properties properties = new Properties();
@@ -136,7 +183,7 @@ public class SbgDataSource {
 	/**
 	 * @return
 	 */
-	public int getDocIdCounter() {
+	public Long getDocIdCounter() {
 		return documentIdCounter.get();
 	}
 
@@ -144,37 +191,24 @@ public class SbgDataSource {
 	 * @param document
 	 * @param nextDocument
 	 */
-	public void updateDomainsDb(SbgMap<String, Object> domain, SbgMap<String, Object> nextDomain) {
-		if (nextDomain.get("_id") == null) {
-			nextDomain.put("_id", domainIdCounter.incrementAndGet());
-			domainsDb.insertOne(nextDomain);
-		} else {
-			domainsDb.replaceOne(domain, nextDomain);
-		}
+	public void updateDomainsDb(Domain domain) {
+		domainRepository.upsertDomain(domain.getUri(), domain.getRobotsContent());
 	}
 
 	/**
 	 * @param document
 	 * @param nextDocument
 	 */
-	public void updateDocumentsDb(SbgMap<String, Object> document, SbgMap<String, Object> nextDocument) {
-		if (nextDocument.get("_id") == null) {
-			nextDocument.put("_id", documentIdCounter.incrementAndGet());
-			documentsDb.insertOne(nextDocument);
-		} else {
-			documentsDb.replaceOne(document, nextDocument);
-		}
+	public void updateDocumentsDb(SbgDocument document) {
+		documentRepository.upsertDocument(document.getUri(), document.getLastModified(), document.getBody());
 	}
 
 	/**
 	 * @param domain
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
-	public Domain findDomain(Domain domain) {
-		Map<String, Object> domainMap = domainsDb.find(domain, SbgMap.class).first();
-		Domain nextDomain = new Domain(domainMap, domain.getUri());
-		return nextDomain;
+	public Domain findDomain(String uri) {
+		return domainRepository.findByUri(uri);
 	}
 
 	/**
@@ -182,16 +216,8 @@ public class SbgDataSource {
 	 * @param search
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
-	public SbgDocument findDocument(SbgDocument sbgPage, boolean search) {
-		SbgDocument nextSbgPage = null;
-		if (search) {
-			Map<String, Object> sbgPageMap = documentsDb.find(sbgPage, SbgMap.class).first();
-			nextSbgPage = new SbgDocument(sbgPageMap, sbgPage.getUri());
-		} else {
-			nextSbgPage = new SbgDocument(sbgPage.getUri());
-		}
-		return nextSbgPage;
+	public SbgDocument findDocument(String uri) {
+		return documentRepository.findByUri(uri);
 	}
 
 	/**

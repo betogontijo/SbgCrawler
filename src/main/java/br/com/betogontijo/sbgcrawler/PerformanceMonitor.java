@@ -15,8 +15,8 @@ public class PerformanceMonitor extends Thread {
 	public void run() {
 		double rate = 0;
 		double currentTime = 0;
-		int initialSize = dataSource.getDocIdCounter();
-		int atualSize = initialSize;
+		Long initialSize = dataSource.getDocIdCounter();
+		Long atualSize = initialSize;
 		while (running) {
 			try {
 				Thread.sleep(1000);
