@@ -1,6 +1,8 @@
 package br.com.betogontijo.sbgcrawler;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.locks.ReentrantLock;
@@ -65,6 +67,22 @@ public class ConcurrentSetQueue<E> extends LinkedHashSet<E> implements Queue<E> 
 			E next = element();
 			remove(next);
 			return next;
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	public List<E> removeMany(int count) {
+		List<E> nextList = new ArrayList<E>();
+		lock.lock();
+		try {
+			while (count > 0) {
+				E next = element();
+				nextList.add(next);
+				remove(next);
+				count--;
+			}
+			return nextList;
 		} finally {
 			lock.unlock();
 		}

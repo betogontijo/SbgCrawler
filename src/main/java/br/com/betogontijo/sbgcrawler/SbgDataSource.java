@@ -1,7 +1,7 @@
 package br.com.betogontijo.sbgcrawler;
 
-import java.io.IOException;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,70 +9,29 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.Queue;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
-import org.springframework.stereotype.Service;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
 import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
 import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 
-//@SpringBootApplication
-//public class SbgBeansApplication {
-//	public static void main(String[] args) {
-//		SpringApplication.run(SbgBeansApplication.class, args);
-//	}
-//
-//	@Bean
-//	CommandLineRunner init(NodeRepository domainRepository) {
-//		return args -> {
-//			Node obj = domainRepository.findByPrefix("batata");
-//			System.out.println(obj);
-//
-//			InvertedList invertedList = new InvertedList();
-//			List<Integer> docRefList = new ArrayList<Integer>();
-//			docRefList.add(1);
-//			invertedList.setDocRefList(docRefList);
-//			List<int[]> occurrencesList = new ArrayList<int[]>();
-//			occurrencesList.add(new int[1]);
-//			invertedList.setOccurrencesList(occurrencesList);
-//
-//			int n = domainRepository.upsertNode("batata", invertedList, new HashMap<Character, Node>());
-//			System.out.println("Number of records updated : " + n);
-//		};
-//
-//	}
-//}
-
-@Service
-@ComponentScan({ "br.com.betogontijo.sbgbeans.crawler" })
-@EnableMongoRepositories("br.com.betogontijo.sbgbeans.crawler.repositories")
 public class SbgDataSource {
 
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
-	private AtomicLong documentIdCounter = new AtomicLong();
-	private AtomicLong domainIdCounter = new AtomicLong();
-
-	private ConnectionManager connectionManager;
+	private AtomicInteger documentIdCounter = new AtomicInteger();
 
 	private Connection mariaDbConnection;
 
-	private Queue<String> referencesBufferQueue;
+	private ConcurrentSetQueue<String> referencesBufferQueue = new ConcurrentSetQueue<String>();
 
 	private static int bufferSize;
 
-	private static int threads;
-
-	@Autowired
-	MongoTemplate mongoTemplate;
+	private static int threadNumber;
 
 	@Autowired
 	SbgDocumentRepository documentRepository;
@@ -80,76 +39,51 @@ public class SbgDataSource {
 	@Autowired
 	DomainRepository domainRepository;
 
-	{
-		try {
-			// Starts connectionFactory
-			connectionManager = new ConnectionManager();
-
-			// Get the connection for references database
-			setMariaDbConnection(connectionManager.getReferencesConnection());
-
-			// Get last document and domain ID
-			Long documentCount = 0L;
-			try {
-				documentCount = documentRepository.count();
-			} catch (NullPointerException e) {
-			}
-			documentIdCounter.set(documentCount);
-			Long domainCount = 0L;
-			try {
-				domainCount = domainRepository.count();
-			} catch (NullPointerException e) {
-			}
-			domainIdCounter.set(domainCount);
-
-			setReferencesBufferQueue(new ConcurrentSetQueue<String>());
-			Properties properties = new Properties();
-			properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
-			setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
-			setThreads(Integer.parseInt(properties.getProperty("environment.threads")));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
 	static SbgDataSource dataSource;
 
-	/**
-	 * @return
-	 */
-	public static SbgDataSource getInstance() {
-		if (dataSource == null) {
-			dataSource = new SbgDataSource();
+	public SbgDataSource(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository,
+			DomainRepository domainRepository) throws Exception {
+		SbgDataSource.threadNumber = threadNumber;
+		this.documentRepository = documentRepository;
+		this.domainRepository = domainRepository;
+
+		// Get the connection for references database
+		initiateMariaDB();
+
+		// Get last document and domain ID
+		long documentCount = 0L;
+		try {
+			documentCount = documentRepository.count();
+		} catch (NullPointerException e) {
 		}
-		return dataSource;
+		documentIdCounter.set((int) documentCount);
+
+		Properties properties = new Properties();
+		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
+		setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
+	}
+
+	private void initiateMariaDB() throws Exception {
+		Properties properties = new Properties();
+		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
+		// Get database connection driver
+		String driver = properties.getProperty("maridb.driver");
+		Class.forName(driver);
+
+		// Configure connection parameters
+		String url = properties.getProperty("maridb.url");
+		String username = properties.getProperty("maridb.username");
+		String password = properties.getProperty("maridb.password");
+
+		// Try connection
+		mariaDbConnection = DriverManager.getConnection(url, username, password);
 	}
 
 	/**
 	 * @return
 	 */
-	private Connection getMariaDbConnection() {
-		return mariaDbConnection;
-	}
-
-	/**
-	 * @param mariaDbConnection
-	 */
-	private void setMariaDbConnection(Connection mariaDbConnection) {
-		this.mariaDbConnection = mariaDbConnection;
-	}
-
-	/**
-	 * @return
-	 */
-	public Queue<String> getReferencesBufferQueue() {
+	public ConcurrentSetQueue<String> getReferencesBufferQueue() {
 		return referencesBufferQueue;
-	}
-
-	/**
-	 * @param referencesBufferQueue
-	 */
-	private void setReferencesBufferQueue(Queue<String> referencesBufferQueue) {
-		this.referencesBufferQueue = referencesBufferQueue;
 	}
 
 	/**
@@ -170,20 +104,13 @@ public class SbgDataSource {
 	 * @return
 	 */
 	private static int getThreads() {
-		return threads;
-	}
-
-	/**
-	 * @param threads
-	 */
-	private static void setThreads(int threads) {
-		SbgDataSource.threads = threads;
+		return threadNumber;
 	}
 
 	/**
 	 * @return
 	 */
-	public Long getDocIdCounter() {
+	public int getDocIdCounter() {
 		return documentIdCounter.get();
 	}
 
@@ -191,16 +118,25 @@ public class SbgDataSource {
 	 * @param document
 	 * @param nextDocument
 	 */
-	public void updateDomainsDb(Domain domain) {
-		domainRepository.upsertDomain(domain.getUri(), domain.getRobotsContent());
+	public void updateDomainsDb(Domain domain, boolean insertDomain) {
+		if (insertDomain) {
+			domainRepository.insertDomain(domain);
+		} else {
+			domainRepository.updateDomain(domain);
+		}
 	}
 
 	/**
 	 * @param document
 	 * @param nextDocument
 	 */
-	public void updateDocumentsDb(SbgDocument document) {
-		documentRepository.upsertDocument(document.getUri(), document.getLastModified(), document.getBody());
+	public void updateDocumentsDb(SbgDocument document, boolean insertDocument) {
+		if (insertDocument) {
+			document.setId(documentIdCounter.incrementAndGet());
+			documentRepository.insertDocument(document);
+		} else {
+			documentRepository.updateDocument(document);
+		}
 	}
 
 	/**
@@ -224,7 +160,7 @@ public class SbgDataSource {
 	 * @return
 	 */
 	private int getBufferPerThread() {
-		return getBufferSize() / getThreads() * 2;
+		return getBufferSize() / getThreads();
 	}
 
 	/**
@@ -234,25 +170,23 @@ public class SbgDataSource {
 		getReferencesBufferQueue().addAll((reference));
 		if (getReferencesBufferQueue().size() > getBufferSize()) {
 			int n = getBufferPerThread();
-			if (n > 0) {
-				try {
-					Statement createStatement = getMariaDbConnection().createStatement();
-					while (n > 0) {
-						StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
-						for (int i = 1024000; builder.length() < i && n > 0; n--) {
-							builder.append("('");
-							builder.append(getReferencesBufferQueue().remove());
-							builder.append("'),");
-						}
-						builder.deleteCharAt(builder.length() - 1);
-						createStatement.addBatch(builder.toString());
+			try {
+				Statement createStatement = mariaDbConnection.createStatement();
+				while (n > 0) {
+					StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
+					for (int i = 1024000; builder.length() < i && n > 0; n--) {
+						builder.append("('");
+						builder.append(getReferencesBufferQueue().remove());
+						builder.append("'),");
 					}
-					createStatement.executeBatch();
-				} catch (SQLException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (NoSuchElementException e1) {
+					builder.deleteCharAt(builder.length() - 1);
+					createStatement.addBatch(builder.toString());
 				}
+				createStatement.executeBatch();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchElementException e1) {
 			}
 		}
 	}
@@ -264,7 +198,7 @@ public class SbgDataSource {
 		// When reaches size of the buffer is time to fill it again
 		if (documentIdCounter.get() > getBufferSize() && getReferencesBufferQueue().size() < getBufferPerThread()) {
 			try {
-				PreparedStatement prepareStatement = getMariaDbConnection()
+				PreparedStatement prepareStatement = mariaDbConnection
 						.prepareStatement(SELECT_AND_REMOVE_REFERENCE_QUERY);
 				prepareStatement.setInt(1, getBufferPerThread());
 				ResultSet executeQuery = prepareStatement.executeQuery();

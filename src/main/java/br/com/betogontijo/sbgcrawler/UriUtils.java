@@ -38,4 +38,10 @@ public final class UriUtils {
 		}
 		return uri;
 	}
+
+	public static String getDomain(String uriPath) throws URISyntaxException {
+		URI uri = new URI(uriPath);
+		String domain = uri.getHost();
+		return domain.startsWith("www.") ? domain.substring(4) : domain;
+	}
 }

@@ -9,21 +9,20 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+
+import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
+import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 
 @SpringBootApplication
+@EnableMongoRepositories("br.com.betogontijo.sbgbeans.crawler.repositories")
 public class SbgCrawlerMain {
 
 	@Autowired
-	SbgDataSource dataSource;
+	SbgDocumentRepository documentRepository;
 
 	@Autowired
-	PerformanceMonitor monitor;
-
-	@Autowired
-	SbgThreadPoolExecutor threadPoolExecutor;
-
-	@Autowired
-	SbgCrawler crawler;
+	DomainRepository domainRepository;
 
 	/**
 	 * @param args
@@ -48,13 +47,17 @@ public class SbgCrawlerMain {
 	 * @throws InterruptedException
 	 */
 	@SuppressWarnings("deprecation")
-	void consume(String[] seeds) throws IOException, InterruptedException {
-		monitor.start();
-
+	void consume(String[] seeds) throws Exception {
 		Properties properties = new Properties();
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
-
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
+		int bufferSize = Integer.parseInt(properties.getProperty("environment.buffer.size"));
+		SbgDataSource dataSource = new SbgDataSource(threadNumber, bufferSize, documentRepository, domainRepository);
+
+		PerformanceMonitor monitor = new PerformanceMonitor(dataSource);
+		monitor.start();
+
+		SbgCrawler crawler = new SbgCrawler(dataSource);
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
@@ -65,7 +68,7 @@ public class SbgCrawlerMain {
 				e.printStackTrace();
 			}
 		}
-
+		SbgThreadPoolExecutor threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
 		while (dataSource.hasReferences()) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {
 				threadPoolExecutor.execute(crawler);

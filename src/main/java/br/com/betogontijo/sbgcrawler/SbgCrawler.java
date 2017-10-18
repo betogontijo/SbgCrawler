@@ -16,8 +16,7 @@ import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.util.UriEncoder;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
@@ -27,13 +26,15 @@ import crawlercommons.robots.SimpleRobotRulesParser;
  * @author BETO
  *
  */
-@Service
 public class SbgCrawler implements Runnable {
 
-	@Autowired
 	private SbgDataSource dataSource;
-	
+
 	private static final byte[] ROBOTS_NULL = new byte[1];
+
+	SbgCrawler(SbgDataSource dataSource) {
+		this.dataSource = dataSource;
+	}
 
 	/**
 	 * @param uri
@@ -41,13 +42,21 @@ public class SbgCrawler implements Runnable {
 	 */
 	public void crawl(String uri) throws Exception {
 		// Load or create the domain for this document
-		Domain domain = dataSource.findDomain(getDomain(uri));
+		boolean insertDomain = false;
+		String domainUri = UriUtils.getDomain(uri);
+		Domain domain = dataSource.findDomain(domainUri);
 		if (domain == null) {
+			insertDomain = true;
 			domain = new Domain();
-			domain.setUri(getDomain(uri));
+			domain.setUri(domainUri);
 		}
 
 		// Try to retrieve robots.txt from this domain
+
+		if (domain.getRobotsContent() == ROBOTS_NULL) {
+			System.out.println();
+		}
+
 		if (domain.getRobotsContent() == null && domain.getRobotsContent() != ROBOTS_NULL) {
 			byte[] robotsCotent = getRobotsCotent(domain.getUri());
 			if (robotsCotent == null) {
@@ -64,50 +73,43 @@ public class SbgCrawler implements Runnable {
 		// Load if the domain was loaded from db.
 		// Otherwise create it.
 		// If the domain wasnt loaded we can assure that document wasnt either.
+		boolean insertDocument = false;
 		SbgDocument sbgDocument = dataSource.findDocument(uri);
 		if (sbgDocument == null) {
+			insertDocument = true;
 			sbgDocument = new SbgDocument();
 			sbgDocument.setUri(uri);
 		}
 		// Check if still updated
-		if (sbgDocument.isOutDated()) {
+		if (!sbgDocument.isOutDated()) {
 			return;
 		}
 		try {
 			// Retrieve the HTML
-			org.jsoup.nodes.Document doc = Jsoup.parse(getInputStream(sbgDocument.getUri()), null,
+			org.jsoup.nodes.Document doc = Jsoup.parse(getInputStream(sbgDocument.getUri()), "UTF-8",
 					sbgDocument.getUri());
 			sbgDocument.setBody(doc.text());
 			sbgDocument.setLastModified(System.currentTimeMillis());
 
 			// Filter references
 			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
-					.not("[hreflang]");
+					.not("[hreflang]").not("[href^=mailto]");
 			List<String> references = new ArrayList<String>();
 			for (Element element : links) {
-				String href = element.attr("abs:href").split("\\?")[0];
-				try {
-					// Parse full path reference uri
-					references.add(UriUtils.pathToUri(href).toString());
-					// getReferences().add(href);
-				} catch (Exception e) {
+				String href = UriEncoder.encode(element.attr("abs:href"));
+				if (!href.isEmpty()) {
+					try {
+						// Parse full path reference uri
+						references.add(UriUtils.pathToUri(href).toString());
+					} catch (Exception e) {
+					}
 				}
 			}
 			dataSource.insertReference(references);
 			// Update the db
-			dataSource.updateDomainsDb(domain);
-			dataSource.updateDocumentsDb(sbgDocument);
+			dataSource.updateDomainsDb(domain, insertDomain);
+			dataSource.updateDocumentsDb(sbgDocument, insertDocument);
 		} catch (Exception e1) {
-		}
-	}
-
-	private String getDomain(String path) {
-		try {
-			URI uri = new URI(path);
-			String domain = uri.getHost();
-			return domain.startsWith("www.") ? domain.substring(4) : domain;
-		} catch (Exception e) {
-			return path;
 		}
 	}
 
@@ -154,7 +156,7 @@ public class SbgCrawler implements Runnable {
 		try {
 			crawl(dataSource.getReference());
 		} catch (Exception e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 		}
 	}
 

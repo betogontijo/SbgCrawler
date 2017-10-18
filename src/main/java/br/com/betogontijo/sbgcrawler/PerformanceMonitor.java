@@ -1,15 +1,16 @@
 package br.com.betogontijo.sbgcrawler;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-@Service
 public class PerformanceMonitor extends Thread {
 
-	@Autowired
 	SbgDataSource dataSource;
 
 	private volatile boolean running = true;
+
+	private static final int printDelay = 1;
+
+	PerformanceMonitor(SbgDataSource dataSource) {
+		this.dataSource = dataSource;
+	}
 
 	/*
 	 * (non-Javadoc)
@@ -18,19 +19,24 @@ public class PerformanceMonitor extends Thread {
 	 */
 	@Override
 	public void run() {
-		double rate = 0;
+		double overallRate = 0;
+		double instantRate = 0;
 		double currentTime = 0;
-		Long initialSize = dataSource.getDocIdCounter();
-		Long atualSize = initialSize;
+		int initialSize = dataSource.getDocIdCounter();
+		int atualSize = initialSize;
+		int delayInMillis = printDelay * 1000;
+		int lastSize;
 		while (running) {
 			try {
-				Thread.sleep(1000);
-				currentTime++;
+				lastSize = atualSize;
 				atualSize = dataSource.getDocIdCounter();
-				rate = (atualSize - initialSize) / currentTime;
-				System.out.printf("Rate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\r", rate, atualSize,
-						dataSource.getReferencesBufferQueue().size());
-
+				overallRate = (atualSize - initialSize) / currentTime;
+				instantRate = (atualSize - lastSize) / printDelay;
+				System.out.printf(
+						"OverallRate: %.2fDoc/s, InstantRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\r",
+						overallRate, instantRate, atualSize, dataSource.getReferencesBufferQueue().size());
+				Thread.sleep(delayInMillis);
+				currentTime += printDelay;
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
