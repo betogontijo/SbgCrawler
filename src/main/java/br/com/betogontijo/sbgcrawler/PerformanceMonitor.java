@@ -22,7 +22,7 @@ public class PerformanceMonitor extends Thread {
 		double overallRate = 0;
 		double instantRate = 0;
 		double currentTime = 0;
-		int initialSize = dataSource.getDocIdCounter();
+		int initialSize = 0;
 		int atualSize = initialSize;
 		int delayInMillis = printDelay * 1000;
 		int lastSize;

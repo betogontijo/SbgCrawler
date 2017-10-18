@@ -23,7 +23,7 @@ public class SbgDataSource {
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
-	private AtomicInteger documentIdCounter = new AtomicInteger();
+	private AtomicInteger documentIdCounter = new AtomicInteger(-1);
 
 	private Connection mariaDbConnection;
 

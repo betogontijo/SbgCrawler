@@ -13,10 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.http.client.utils.URIUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.yaml.snakeyaml.util.UriEncoder;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
@@ -96,12 +96,13 @@ public class SbgCrawler implements Runnable {
 					.not("[hreflang]").not("[href^=mailto]");
 			List<String> references = new ArrayList<String>();
 			for (Element element : links) {
-				String href = UriEncoder.encode(element.attr("abs:href"));
+				String href = URIUtils.rewriteURI(new URI(element.attr("abs:href"))).toString();
 				if (!href.isEmpty()) {
 					try {
 						// Parse full path reference uri
-						references.add(UriUtils.pathToUri(href).toString());
+						references.add(href);
 					} catch (Exception e) {
+						System.out.println(href);
 					}
 				}
 			}
