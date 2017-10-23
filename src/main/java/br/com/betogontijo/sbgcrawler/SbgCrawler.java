@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.http.client.utils.URIUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -97,7 +96,7 @@ public class SbgCrawler implements Runnable {
 			List<String> references = new ArrayList<String>();
 			for (Element element : links) {
 				try {
-					String href = URIUtils.rewriteURI(new URI(element.attr("abs:href"))).toString();
+					String href = new URI(element.attr("abs:href")).toString();
 					if (!href.isEmpty()) {
 						// Parse full path reference uri
 						references.add(href);
