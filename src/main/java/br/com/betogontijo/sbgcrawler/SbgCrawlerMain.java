@@ -1,6 +1,8 @@
 package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,17 +61,18 @@ public class SbgCrawlerMain {
 
 		SbgCrawler crawler = new SbgCrawler(dataSource);
 
+		List<String> references = new ArrayList<String>();
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
-				String uri = UriUtils.pathToUri(seeds[i]).toString();
-				crawler.crawl(uri);
+				references.add(UriUtils.pathToUri(seeds[i]).toString());
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
+		dataSource.insertReference(references);
 		SbgThreadPoolExecutor threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
-		while (dataSource.hasReferences()) {
+		while (dataSource.hasReferences() || threadPoolExecutor.getActiveCount() > 0) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {
 				threadPoolExecutor.execute(crawler);
 			}

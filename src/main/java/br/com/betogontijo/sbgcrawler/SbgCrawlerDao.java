@@ -116,7 +116,7 @@ public class SbgCrawlerDao {
 	 */
 	public void updateDomainsDb(Domain domain, boolean insertDomain) {
 		if (insertDomain) {
-			domainRepository.upsertDomain(domain);
+			domainRepository.insertDomain(domain);
 		} else {
 			domainRepository.updateDomain(domain);
 		}
@@ -129,7 +129,7 @@ public class SbgCrawlerDao {
 	public void updateDocumentsDb(SbgDocument document, boolean insertDocument) {
 		if (insertDocument) {
 			document.setId(documentIdCounter.getAndIncrement());
-			documentRepository.upsertDocument(document);
+			documentRepository.insertDocument(document);
 		} else {
 			documentRepository.updateDocument(document);
 		}
