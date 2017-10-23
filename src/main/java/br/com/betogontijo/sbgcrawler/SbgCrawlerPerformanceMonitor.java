@@ -1,14 +1,14 @@
 package br.com.betogontijo.sbgcrawler;
 
-public class PerformanceMonitor extends Thread {
+public class SbgCrawlerPerformanceMonitor extends Thread {
 
-	SbgDataSource dataSource;
+	SbgCrawlerDao dataSource;
 
 	private volatile boolean running = true;
 
 	private static final int printDelay = 1;
 
-	PerformanceMonitor(SbgDataSource dataSource) {
+	SbgCrawlerPerformanceMonitor(SbgCrawlerDao dataSource) {
 		this.dataSource = dataSource;
 	}
 

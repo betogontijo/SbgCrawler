@@ -52,9 +52,9 @@ public class SbgCrawlerMain {
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
 		int bufferSize = Integer.parseInt(properties.getProperty("environment.buffer.size"));
-		SbgDataSource dataSource = new SbgDataSource(threadNumber, bufferSize, documentRepository, domainRepository);
+		SbgCrawlerDao dataSource = new SbgCrawlerDao(threadNumber, bufferSize, documentRepository, domainRepository);
 
-		PerformanceMonitor monitor = new PerformanceMonitor(dataSource);
+		SbgCrawlerPerformanceMonitor monitor = new SbgCrawlerPerformanceMonitor(dataSource);
 		monitor.start();
 
 		SbgCrawler crawler = new SbgCrawler(dataSource);

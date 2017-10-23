@@ -18,12 +18,12 @@ import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
 import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
 import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 
-public class SbgDataSource {
+public class SbgCrawlerDao {
 
 	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
-	private AtomicInteger documentIdCounter = new AtomicInteger(-1);
+	private AtomicInteger documentIdCounter;
 
 	private Connection mariaDbConnection;
 
@@ -39,11 +39,11 @@ public class SbgDataSource {
 	@Autowired
 	DomainRepository domainRepository;
 
-	static SbgDataSource dataSource;
+	static SbgCrawlerDao dataSource;
 
-	public SbgDataSource(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository,
+	public SbgCrawlerDao(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository,
 			DomainRepository domainRepository) throws Exception {
-		SbgDataSource.threadNumber = threadNumber;
+		SbgCrawlerDao.threadNumber = threadNumber;
 		this.documentRepository = documentRepository;
 		this.domainRepository = domainRepository;
 
@@ -51,12 +51,8 @@ public class SbgDataSource {
 		initiateMariaDB();
 
 		// Get last document and domain ID
-		long documentCount = 0L;
-		try {
-			documentCount = documentRepository.count();
-		} catch (NullPointerException e) {
-		}
-		documentIdCounter.set((int) documentCount);
+		int documentCount = (int) documentRepository.count();
+		documentIdCounter = new AtomicInteger(documentCount);
 
 		Properties properties = new Properties();
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
@@ -97,7 +93,7 @@ public class SbgDataSource {
 	 * @param bufferSize
 	 */
 	private static void setBufferSize(int bufferSize) {
-		SbgDataSource.bufferSize = bufferSize;
+		SbgCrawlerDao.bufferSize = bufferSize;
 	}
 
 	/**
@@ -120,7 +116,7 @@ public class SbgDataSource {
 	 */
 	public void updateDomainsDb(Domain domain, boolean insertDomain) {
 		if (insertDomain) {
-			domainRepository.insertDomain(domain);
+			domainRepository.upsertDomain(domain);
 		} else {
 			domainRepository.updateDomain(domain);
 		}
@@ -132,8 +128,8 @@ public class SbgDataSource {
 	 */
 	public void updateDocumentsDb(SbgDocument document, boolean insertDocument) {
 		if (insertDocument) {
-			document.setId(documentIdCounter.incrementAndGet());
-			documentRepository.insertDocument(document);
+			document.setId(documentIdCounter.getAndIncrement());
+			documentRepository.upsertDocument(document);
 		} else {
 			documentRepository.updateDocument(document);
 		}

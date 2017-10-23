@@ -28,11 +28,11 @@ import crawlercommons.robots.SimpleRobotRulesParser;
  */
 public class SbgCrawler implements Runnable {
 
-	private SbgDataSource dataSource;
+	private SbgCrawlerDao dataSource;
 
 	private static final byte[] ROBOTS_NULL = new byte[1];
 
-	SbgCrawler(SbgDataSource dataSource) {
+	SbgCrawler(SbgCrawlerDao dataSource) {
 		this.dataSource = dataSource;
 	}
 
@@ -96,14 +96,13 @@ public class SbgCrawler implements Runnable {
 					.not("[hreflang]").not("[href^=mailto]");
 			List<String> references = new ArrayList<String>();
 			for (Element element : links) {
-				String href = URIUtils.rewriteURI(new URI(element.attr("abs:href"))).toString();
-				if (!href.isEmpty()) {
-					try {
+				try {
+					String href = URIUtils.rewriteURI(new URI(element.attr("abs:href"))).toString();
+					if (!href.isEmpty()) {
 						// Parse full path reference uri
 						references.add(href);
-					} catch (Exception e) {
-						System.out.println(href);
 					}
+				} catch (Exception e) {
 				}
 			}
 			dataSource.insertReference(references);
@@ -119,12 +118,14 @@ public class SbgCrawler implements Runnable {
 		URI uri = new URI(uriPath);
 		String scheme = uri.getScheme();
 
-		if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("ftp")) {
-			return uri.toURL().openStream();
-		} else if (scheme.equalsIgnoreCase("file")) {
+		if (scheme.equalsIgnoreCase("file")) {
 			return new FileInputStream(new File(uri.getPath()));
 		} else {
-			return null;
+			try {
+				return uri.toURL().openStream();
+			} catch (Exception e) {
+				return null;
+			}
 		}
 	}
 
