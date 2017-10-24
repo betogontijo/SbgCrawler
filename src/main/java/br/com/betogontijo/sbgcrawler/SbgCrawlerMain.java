@@ -13,7 +13,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
-import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
 import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 
 @SpringBootApplication
@@ -22,9 +21,6 @@ public class SbgCrawlerMain {
 
 	@Autowired
 	SbgDocumentRepository documentRepository;
-
-	@Autowired
-	DomainRepository domainRepository;
 
 	/**
 	 * @param args
@@ -54,7 +50,7 @@ public class SbgCrawlerMain {
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
 		int bufferSize = Integer.parseInt(properties.getProperty("environment.buffer.size"));
-		SbgCrawlerDao dataSource = new SbgCrawlerDao(threadNumber, bufferSize, documentRepository, domainRepository);
+		SbgCrawlerDao dataSource = new SbgCrawlerDao(threadNumber, bufferSize, documentRepository);
 
 		SbgCrawlerPerformanceMonitor monitor = new SbgCrawlerPerformanceMonitor(dataSource);
 		monitor.start();

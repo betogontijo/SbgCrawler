@@ -7,20 +7,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.springframework.beans.factory.annotation.Autowired;
-
-import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
-import br.com.betogontijo.sbgbeans.crawler.repositories.DomainRepository;
 import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 
 public class SbgCrawlerDao {
 
-	static final String INSERT_REFERENCE_QUERY = "INSERT INTO refs (uri) VALUES ";
+	static final String INSERT_REFERENCE_QUERY = "INSERT IGNORE INTO refs (uri) VALUES ";
 	static final String SELECT_AND_REMOVE_REFERENCE_QUERY = "DELETE FROM refs LIMIT ? RETURNING uri";
 
 	private AtomicInteger documentIdCounter;
@@ -31,21 +26,14 @@ public class SbgCrawlerDao {
 
 	private static int bufferSize;
 
-	private static int threadNumber;
+	private static int bufferPerThread;
 
-	@Autowired
 	SbgDocumentRepository documentRepository;
-
-	@Autowired
-	DomainRepository domainRepository;
 
 	static SbgCrawlerDao dataSource;
 
-	public SbgCrawlerDao(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository,
-			DomainRepository domainRepository) throws Exception {
-		SbgCrawlerDao.threadNumber = threadNumber;
+	public SbgCrawlerDao(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository) throws Exception {
 		this.documentRepository = documentRepository;
-		this.domainRepository = domainRepository;
 
 		// Get the connection for references database
 		initiateMariaDB();
@@ -54,9 +42,8 @@ public class SbgCrawlerDao {
 		int documentCount = (int) documentRepository.count();
 		documentIdCounter = new AtomicInteger(documentCount);
 
-		Properties properties = new Properties();
-		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
-		setBufferSize(Integer.parseInt(properties.getProperty("environment.buffer.size")));
+		setBufferSize(bufferSize);
+		setBufferPerThread(bufferSize / threadNumber);
 	}
 
 	private void initiateMariaDB() throws Exception {
@@ -99,27 +86,8 @@ public class SbgCrawlerDao {
 	/**
 	 * @return
 	 */
-	private static int getThreads() {
-		return threadNumber;
-	}
-
-	/**
-	 * @return
-	 */
 	public int getDocIdCounter() {
 		return documentIdCounter.get();
-	}
-
-	/**
-	 * @param document
-	 * @param nextDocument
-	 */
-	public void updateDomainsDb(Domain domain, boolean insertDomain) {
-		if (insertDomain) {
-			domainRepository.insertDomain(domain);
-		} else {
-			domainRepository.updateDomain(domain);
-		}
 	}
 
 	/**
@@ -136,27 +104,12 @@ public class SbgCrawlerDao {
 	}
 
 	/**
-	 * @param domain
-	 * @return
-	 */
-	public Domain findDomain(String uri) {
-		return domainRepository.findByUri(uri);
-	}
-
-	/**
 	 * @param sbgPage
 	 * @param search
 	 * @return
 	 */
 	public SbgDocument findDocument(String uri) {
 		return documentRepository.findByUri(uri);
-	}
-
-	/**
-	 * @return
-	 */
-	private int getBufferPerThread() {
-		return getBufferSize() / getThreads();
 	}
 
 	/**
@@ -171,18 +124,22 @@ public class SbgCrawlerDao {
 				while (n > 0) {
 					StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
 					for (int i = 1024000; builder.length() < i && n > 0; n--) {
-						builder.append("('");
-						builder.append(getReferencesBufferQueue().remove());
-						builder.append("'),");
+						String remove = getReferencesBufferQueue().remove().replaceAll("\'", "\'\'");
+						if (remove != null) {
+							builder.append("('");
+							builder.append(remove);
+							builder.append("'),");
+						} else {
+							break;
+						}
 					}
 					builder.deleteCharAt(builder.length() - 1);
 					createStatement.addBatch(builder.toString());
 				}
 				createStatement.executeBatch();
-			} catch (SQLException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			} catch (NoSuchElementException e1) {
 			}
 		}
 	}
@@ -228,6 +185,14 @@ public class SbgCrawlerDao {
 		} else {
 			return true;
 		}
+	}
+
+	public int getBufferPerThread() {
+		return bufferPerThread;
+	}
+
+	public void setBufferPerThread(int bufferPerThread) {
+		SbgCrawlerDao.bufferPerThread = bufferPerThread;
 	}
 
 }

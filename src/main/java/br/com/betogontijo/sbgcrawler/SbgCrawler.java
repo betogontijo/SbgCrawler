@@ -14,10 +14,10 @@ import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import br.com.betogontijo.sbgbeans.crawler.documents.Domain;
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
@@ -29,8 +29,6 @@ public class SbgCrawler implements Runnable {
 
 	private SbgCrawlerDao dataSource;
 
-	private static final byte[] ROBOTS_NULL = new byte[1];
-
 	SbgCrawler(SbgCrawlerDao dataSource) {
 		this.dataSource = dataSource;
 	}
@@ -41,39 +39,37 @@ public class SbgCrawler implements Runnable {
 	 */
 	public void crawl(String uri) throws Exception {
 		// Load or create the domain for this document
-		boolean insertDomain = false;
-		String domainUri = UriUtils.getDomain(uri);
-		Domain domain = dataSource.findDomain(domainUri);
-		if (domain == null) {
-			insertDomain = true;
-			domain = new Domain();
-			domain.setUri(domainUri);
-		}
+		boolean insertIndex = false;
+		String uriIndex = UriUtils.getIndex(uri);
+		SbgDocument index = dataSource.findDocument(uriIndex);
+		if (index == null) {
+			insertIndex = true;
+			index = new SbgDocument();
+			index.setUri(uriIndex);
 
-		// Try to retrieve robots.txt from this domain
+			// Try to retrieve robots.txt from this domain
+			index.setRobotsContent(getRobotsCotent(uriIndex));
 
-		if (domain.getRobotsContent() == ROBOTS_NULL) {
-			System.out.println();
-		}
-
-		if (domain.getRobotsContent() == null && domain.getRobotsContent() != ROBOTS_NULL) {
-			byte[] robotsCotent = getRobotsCotent(domain.getUri());
-			if (robotsCotent == null) {
-				domain.setRobotsContent(ROBOTS_NULL);
-			} else {
-				domain.setRobotsContent(robotsCotent);
+			// Check if page is allowed
+			if (!isPageAllowed(index, uri)) {
+				return;
 			}
-		}
-
-		// Check if page is allowed
-		if (!isPageAllowed(domain, uri)) {
+		} else
+		// Try to retrieve robots.txt from this domain
+		if ((index.getRobotsContent() != null)
+				// Check if page is allowed
+				&& (!isPageAllowed(index, uri))) {
 			return;
 		}
+
 		// Load if the domain was loaded from db.
 		// Otherwise create it.
 		// If the domain wasnt loaded we can assure that document wasnt either.
 		boolean insertDocument = false;
-		SbgDocument sbgDocument = dataSource.findDocument(uri);
+		SbgDocument sbgDocument = null;
+		if (!insertIndex) {
+			sbgDocument = dataSource.findDocument(uri);
+		}
 		if (sbgDocument == null) {
 			insertDocument = true;
 			sbgDocument = new SbgDocument();
@@ -83,33 +79,38 @@ public class SbgCrawler implements Runnable {
 		if (!sbgDocument.isOutDated()) {
 			return;
 		}
-		try {
-			// Retrieve the HTML
-			org.jsoup.nodes.Document doc = Jsoup.parse(getInputStream(sbgDocument.getUri()), "UTF-8",
-					sbgDocument.getUri());
-			sbgDocument.setBody(doc.text());
-			sbgDocument.setLastModified(System.currentTimeMillis());
-
-			// Filter references
-			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
-					.not("[hreflang]").not("[href^=mailto]");
-			List<String> references = new ArrayList<String>();
-			for (Element element : links) {
-				try {
-					String href = new URI(element.attr("abs:href")).toString();
-					if (!href.isEmpty()) {
-						// Parse full path reference uri
-						references.add(href);
-					}
-				} catch (Exception e) {
-				}
-			}
-			dataSource.insertReference(references);
-			// Update the db
-			dataSource.updateDomainsDb(domain, insertDomain);
-			dataSource.updateDocumentsDb(sbgDocument, insertDocument);
-		} catch (Exception e1) {
+		fetchUri(sbgDocument);
+		// Update the db
+		if (!(index.getUri().equals(sbgDocument.getUri())) && insertIndex) {
+			fetchUri(index);
+			dataSource.updateDocumentsDb(index, insertDocument);
 		}
+		dataSource.updateDocumentsDb(sbgDocument, insertDocument);
+	}
+
+	private void fetchUri(SbgDocument sbgDocument) throws IOException, MalformedURLException, URISyntaxException {
+		// Retrieve the HTML
+		InputStream inputStream = getInputStream(sbgDocument.getUri());
+		Document doc = Jsoup.parse(inputStream, null, sbgDocument.getUri());
+		// TODO Check 200 OK
+		sbgDocument.setBody(doc.text());
+		sbgDocument.setLastModified(System.currentTimeMillis());
+
+		// Filter references
+		Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
+				.not("[hreflang]").not("[href^=mailto]");
+		List<String> references = new ArrayList<String>();
+		for (Element element : links) {
+			try {
+				String href = UriUtils.formatUri(element.attr("abs:href"));
+				if (!href.isEmpty()) {
+					// Parse full path reference uri
+					references.add(href);
+				}
+			} catch (URISyntaxException e) {
+			}
+		}
+		dataSource.insertReference(references);
 	}
 
 	public static InputStream getInputStream(String uriPath)
@@ -142,9 +143,9 @@ public class SbgCrawler implements Runnable {
 		}
 	}
 
-	public boolean isPageAllowed(Domain domain, String page) {
+	public boolean isPageAllowed(SbgDocument index, String page) {
 		return new SimpleRobotRulesParser()
-				.parseContent(domain.getUri(), domain.getRobotsContent(), "text/html; charset=UTF-8", "SbgRobot")
+				.parseContent(index.getUri(), index.getRobotsContent(), "text/html; charset=UTF-8", "SbgRobot")
 				.isAllowed(page);
 	}
 

@@ -39,9 +39,42 @@ public final class UriUtils {
 		return uri;
 	}
 
-	public static String getDomain(String uriPath) throws URISyntaxException {
+	public static String getIndex(String uriPath) throws URISyntaxException {
 		URI uri = new URI(uriPath);
-		String domain = uri.getHost();
-		return domain.startsWith("www.") ? domain.substring(4) : domain;
+		StringBuffer sb = new StringBuffer();
+		if (uri.getScheme() != null) {
+			sb.append(uri.getScheme());
+			sb.append(':');
+		}
+		if (uri.isOpaque()) {
+			sb.append(uri.getSchemeSpecificPart());
+		} else {
+			String host = uri.getHost();
+			if (host != null) {
+				sb.append("//");
+				if (uri.getUserInfo() != null) {
+					sb.append(uri.getUserInfo());
+					sb.append('@');
+				}
+				boolean needBrackets = ((host.indexOf(':') >= 0) && !host.startsWith("[") && !host.endsWith("]"));
+				if (needBrackets)
+					sb.append('[');
+				host = host.startsWith("www.") ? host : "www." + host;
+				// host = host.startsWith("www.") ? host.substring(4) : host;
+				sb.append(host);
+				if (needBrackets)
+					sb.append(']');
+				if (uri.getPort() != -1) {
+					sb.append(':');
+					sb.append(uri.getPort());
+				}
+			}
+		}
+		String string = sb.toString();
+		return string.endsWith("/") ? string : string + "/";
+	}
+
+	public static String formatUri(String uri) throws URISyntaxException {
+		return new URI(uri).toString();
 	}
 }
