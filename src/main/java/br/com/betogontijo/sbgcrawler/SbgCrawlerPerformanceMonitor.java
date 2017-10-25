@@ -21,7 +21,7 @@ public class SbgCrawlerPerformanceMonitor extends Thread {
 	public void run() {
 		double overallRate = 0;
 		double instantRate = 0;
-		double currentTime = 0;
+		double currentTime = 1;
 		int initialSize = 0;
 		int atualSize = initialSize;
 		int delayInMillis = printDelay * 1000;
@@ -33,7 +33,7 @@ public class SbgCrawlerPerformanceMonitor extends Thread {
 				overallRate = (atualSize - initialSize) / currentTime;
 				instantRate = (atualSize - lastSize) / printDelay;
 				System.out.printf(
-						"OverallRate: %.2fDoc/s, InstantRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\r",
+						"OverallRate: %.2fDoc/s, InstantRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\n",
 						overallRate, instantRate, atualSize, dataSource.getReferencesBufferQueue().size());
 				Thread.sleep(delayInMillis);
 				currentTime += printDelay;

@@ -17,29 +17,14 @@ public class ConcurrentSetQueue<E> extends LinkedHashSet<E> implements Queue<E> 
 
 	final java.util.concurrent.locks.ReentrantLock lock = new ReentrantLock();
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.util.Queue#element()
-	 */
 	public E element() {
 		return iterator().next();
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.util.Queue#offer(java.lang.Object)
-	 */
 	public boolean offer(E arg0) {
 		return add(arg0);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.util.Queue#peek()
-	 */
 	public E peek() {
 		try {
 			return element();
@@ -48,11 +33,6 @@ public class ConcurrentSetQueue<E> extends LinkedHashSet<E> implements Queue<E> 
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.util.Queue#poll()
-	 */
 	public E poll() {
 		return remove();
 	}
@@ -70,11 +50,6 @@ public class ConcurrentSetQueue<E> extends LinkedHashSet<E> implements Queue<E> 
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.util.Queue#remove()
-	 */
 	public E remove() {
 		lock.lock();
 		try {

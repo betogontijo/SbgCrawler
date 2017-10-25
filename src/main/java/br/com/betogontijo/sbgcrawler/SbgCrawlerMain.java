@@ -1,8 +1,6 @@
 package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +42,6 @@ public class SbgCrawlerMain {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	@SuppressWarnings("deprecation")
 	void consume(String[] seeds) throws Exception {
 		Properties properties = new Properties();
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
@@ -57,23 +54,21 @@ public class SbgCrawlerMain {
 
 		SbgCrawler crawler = new SbgCrawler(dataSource);
 
-		List<String> references = new ArrayList<String>();
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
-				references.add(UriUtils.pathToUri(seeds[i]).toString());
+				crawler.crawl(UriUtils.pathToUri(seeds[i]).toString());
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-		dataSource.insertReference(references);
 		SbgThreadPoolExecutor threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
-		while (dataSource.hasReferences() || threadPoolExecutor.getActiveCount() > 0) {
+		while (!crawler.isCanceled()) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {
 				threadPoolExecutor.execute(crawler);
 			}
 		}
 		threadPoolExecutor.shutdown();
-		monitor.stop();
+		monitor.cancel();
 	}
 }

@@ -29,8 +29,11 @@ public class SbgCrawler implements Runnable {
 
 	private SbgCrawlerDao dataSource;
 
+	private boolean canceled;
+
 	SbgCrawler(SbgCrawlerDao dataSource) {
 		this.dataSource = dataSource;
+		setCanceled(false);
 	}
 
 	/**
@@ -83,34 +86,38 @@ public class SbgCrawler implements Runnable {
 		// Update the db
 		if (!(index.getUri().equals(sbgDocument.getUri())) && insertIndex) {
 			fetchUri(index);
-			dataSource.updateDocumentsDb(index, insertDocument);
+			dataSource.upsertIndexDocumentsDb(index);
 		}
 		dataSource.updateDocumentsDb(sbgDocument, insertDocument);
 	}
 
 	private void fetchUri(SbgDocument sbgDocument) throws IOException, MalformedURLException, URISyntaxException {
-		// Retrieve the HTML
-		InputStream inputStream = getInputStream(sbgDocument.getUri());
-		Document doc = Jsoup.parse(inputStream, null, sbgDocument.getUri());
-		// TODO Check 200 OK
-		sbgDocument.setBody(doc.text());
-		sbgDocument.setLastModified(System.currentTimeMillis());
+		try {
+			// Retrieve the HTML
+			InputStream inputStream = getInputStream(sbgDocument.getUri());
+			Document doc = Jsoup.parse(inputStream, null, sbgDocument.getUri());
+			// TODO Check 200 OK
+			sbgDocument.setBody(doc.text());
+			sbgDocument.setLastModified(System.currentTimeMillis());
 
-		// Filter references
-		Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
-				.not("[hreflang]").not("[href^=mailto]");
-		List<String> references = new ArrayList<String>();
-		for (Element element : links) {
-			try {
-				String href = UriUtils.formatUri(element.attr("abs:href"));
-				if (!href.isEmpty()) {
-					// Parse full path reference uri
-					references.add(href);
+			// Filter references
+			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
+					.not("[hreflang]").not("[href^=mailto]");
+			List<String> references = new ArrayList<String>();
+			for (Element element : links) {
+				try {
+					String href = UriUtils.formatUri(element.attr("abs:href"));
+					if (!href.isEmpty()) {
+						// Parse full path reference uri
+						references.add(href);
+					}
+				} catch (URISyntaxException e) {
 				}
-			} catch (URISyntaxException e) {
 			}
+			dataSource.insertReference(references);
+		} catch (Exception e) {
+
 		}
-		dataSource.insertReference(references);
 	}
 
 	public static InputStream getInputStream(String uriPath)
@@ -156,10 +163,23 @@ public class SbgCrawler implements Runnable {
 	 */
 	public void run() {
 		try {
-			crawl(dataSource.getReference());
+			String reference = dataSource.getReference();
+			if (reference != null) {
+				crawl(reference);
+			} else {
+				setCanceled(true);
+			}
 		} catch (Exception e) {
 			// e.printStackTrace();
 		}
+	}
+
+	public boolean isCanceled() {
+		return canceled;
+	}
+
+	public void setCanceled(boolean canceled) {
+		this.canceled = canceled;
 	}
 
 }

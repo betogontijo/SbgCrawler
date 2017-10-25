@@ -26,9 +26,11 @@ public class SbgCrawlerDao {
 
 	private static int bufferSize;
 
-	private static int bufferPerThread;
+	private static int threadNumber;
 
 	SbgDocumentRepository documentRepository;
+
+	private static boolean hasFilledOnce;
 
 	static SbgCrawlerDao dataSource;
 
@@ -43,7 +45,7 @@ public class SbgCrawlerDao {
 		documentIdCounter = new AtomicInteger(documentCount);
 
 		setBufferSize(bufferSize);
-		setBufferPerThread(bufferSize / threadNumber);
+		setThreadNumber(threadNumber);
 	}
 
 	private void initiateMariaDB() throws Exception {
@@ -103,6 +105,11 @@ public class SbgCrawlerDao {
 		}
 	}
 
+	public void upsertIndexDocumentsDb(SbgDocument index) {
+		index.setId(documentIdCounter.getAndIncrement());
+		documentRepository.insertDocument(index);
+	}
+
 	/**
 	 * @param sbgPage
 	 * @param search
@@ -118,6 +125,7 @@ public class SbgCrawlerDao {
 	public void insertReference(List<String> reference) {
 		getReferencesBufferQueue().addAll((reference));
 		if (getReferencesBufferQueue().size() > getBufferSize()) {
+			hasFilledOnce = true;
 			int n = getBufferPerThread();
 			try {
 				Statement createStatement = mariaDbConnection.createStatement();
@@ -149,7 +157,7 @@ public class SbgCrawlerDao {
 	 */
 	public String getReference() {
 		// When reaches size of the buffer is time to fill it again
-		if (documentIdCounter.get() > getBufferSize() && getReferencesBufferQueue().size() < getBufferPerThread()) {
+		if (hasFilledOnce && getReferencesBufferQueue().size() < getBufferPerThread()) {
 			try {
 				PreparedStatement prepareStatement = mariaDbConnection
 						.prepareStatement(SELECT_AND_REMOVE_REFERENCE_QUERY);
@@ -163,36 +171,19 @@ public class SbgCrawlerDao {
 				e.printStackTrace();
 			}
 		}
-		if (getReferencesBufferQueue().size() > 0) {
-			return getReferencesBufferQueue().remove();
-		} else {
-			return null;
-		}
-	}
-
-	/**
-	 * @return
-	 */
-	public boolean hasReferences() {
-		if (getReferencesBufferQueue().size() == 0) {
-			String ref = getReference();
-			if (ref == null) {
-				return false;
-			} else {
-				getReferencesBufferQueue().add(ref);
-				return true;
-			}
-		} else {
-			return true;
-		}
+		return getReferencesBufferQueue().remove();
 	}
 
 	public int getBufferPerThread() {
-		return bufferPerThread;
+		return getReferencesBufferQueue().size() / getThreadNumber();
 	}
 
-	public void setBufferPerThread(int bufferPerThread) {
-		SbgCrawlerDao.bufferPerThread = bufferPerThread;
+	public static int getThreadNumber() {
+		return threadNumber;
+	}
+
+	public static void setThreadNumber(int threadNumber) {
+		SbgCrawlerDao.threadNumber = threadNumber;
 	}
 
 }

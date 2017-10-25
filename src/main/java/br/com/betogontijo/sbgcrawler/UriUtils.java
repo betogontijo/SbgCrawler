@@ -49,19 +49,17 @@ public final class UriUtils {
 		if (uri.isOpaque()) {
 			sb.append(uri.getSchemeSpecificPart());
 		} else {
-			String host = uri.getHost();
-			if (host != null) {
+			if (uri.getHost() != null) {
 				sb.append("//");
 				if (uri.getUserInfo() != null) {
 					sb.append(uri.getUserInfo());
 					sb.append('@');
 				}
-				boolean needBrackets = ((host.indexOf(':') >= 0) && !host.startsWith("[") && !host.endsWith("]"));
+				boolean needBrackets = ((uri.getHost().indexOf(':') >= 0) && !uri.getHost().startsWith("[")
+						&& !uri.getHost().endsWith("]"));
 				if (needBrackets)
 					sb.append('[');
-				host = host.startsWith("www.") ? host : "www." + host;
-				// host = host.startsWith("www.") ? host.substring(4) : host;
-				sb.append(host);
+				sb.append(uri.getHost());
 				if (needBrackets)
 					sb.append(']');
 				if (uri.getPort() != -1) {
