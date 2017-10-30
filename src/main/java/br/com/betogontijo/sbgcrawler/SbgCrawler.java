@@ -97,6 +97,7 @@ public class SbgCrawler implements Runnable {
 			InputStream inputStream = getInputStream(sbgDocument.getUri());
 			Document doc = Jsoup.parse(inputStream, null, sbgDocument.getUri());
 			// TODO Check 200 OK
+			sbgDocument.setTitle(doc.title());
 			sbgDocument.setBody(doc.text());
 			sbgDocument.setLastModified(System.currentTimeMillis());
 
