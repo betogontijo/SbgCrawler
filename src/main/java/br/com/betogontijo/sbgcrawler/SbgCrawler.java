@@ -86,7 +86,7 @@ public class SbgCrawler implements Runnable {
 		// Update the db
 		if (!(index.getUri().equals(sbgDocument.getUri())) && insertIndex) {
 			fetchUri(index);
-			dataSource.upsertIndexDocumentsDb(index);
+			dataSource.insertIndexDocumentsDb(index);
 		}
 		dataSource.updateDocumentsDb(sbgDocument, insertDocument);
 	}

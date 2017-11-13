@@ -2,6 +2,9 @@ package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.PreDestroy;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -17,8 +20,18 @@ import br.com.betogontijo.sbgbeans.crawler.repositories.SbgDocumentRepository;
 @EnableMongoRepositories("br.com.betogontijo.sbgbeans.crawler.repositories")
 public class SbgCrawlerMain {
 
+	static ConfigurableApplicationContext run;
+
 	@Autowired
 	SbgDocumentRepository documentRepository;
+
+	SbgThreadPoolExecutor threadPoolExecutor;
+
+	SbgCrawlerDao dataSource;
+
+	SbgCrawlerPerformanceMonitor monitor;
+
+	SbgCrawler crawler;
 
 	/**
 	 * @param args
@@ -26,7 +39,7 @@ public class SbgCrawlerMain {
 	 * @throws InterruptedException
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
-		SpringApplication.run(SbgCrawlerMain.class, args);
+		run = SpringApplication.run(SbgCrawlerMain.class, args);
 	}
 
 	@Bean
@@ -47,12 +60,12 @@ public class SbgCrawlerMain {
 		properties.load(ClassLoader.getSystemResourceAsStream("sbgcrawler.properties"));
 		int threadNumber = Integer.parseInt(properties.getProperty("environment.threads"));
 		int bufferSize = Integer.parseInt(properties.getProperty("environment.buffer.size"));
-		SbgCrawlerDao dataSource = new SbgCrawlerDao(threadNumber, bufferSize, documentRepository);
+		dataSource = new SbgCrawlerDao(threadNumber, bufferSize, documentRepository);
 
-		SbgCrawlerPerformanceMonitor monitor = new SbgCrawlerPerformanceMonitor(dataSource);
+		monitor = new SbgCrawlerPerformanceMonitor(dataSource);
 		monitor.start();
 
-		SbgCrawler crawler = new SbgCrawler(dataSource);
+		crawler = new SbgCrawler(dataSource);
 
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
@@ -62,7 +75,7 @@ public class SbgCrawlerMain {
 				e.printStackTrace();
 			}
 		}
-		SbgThreadPoolExecutor threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
+		threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
 		while (!crawler.isCanceled()) {
 			if (threadPoolExecutor.getActiveCount() < threadNumber) {
 				threadPoolExecutor.execute(crawler);
@@ -70,5 +83,21 @@ public class SbgCrawlerMain {
 		}
 		threadPoolExecutor.shutdown();
 		monitor.cancel();
+	}
+
+	@PreDestroy
+	public void onDestroy() {
+		System.out.println("Shutting down...");
+		crawler.setCanceled(true);
+		try {
+			threadPoolExecutor.awaitTermination(1, TimeUnit.MINUTES);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("Writing "+dataSource.getReferencesBufferQueue().size()+" references from buffer on disk...");
+		dataSource.saveRefsOnDisk(dataSource.getReferencesBufferQueue().size());
+		monitor.cancel();
+		System.out.println("Shutdown, buffer is down to " + dataSource.getReferencesBufferQueue().size() + ".");
 	}
 }

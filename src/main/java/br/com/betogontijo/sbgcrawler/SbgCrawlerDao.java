@@ -30,8 +30,6 @@ public class SbgCrawlerDao {
 
 	SbgDocumentRepository documentRepository;
 
-	private static boolean hasFilledOnce;
-
 	static SbgCrawlerDao dataSource;
 
 	public SbgCrawlerDao(int threadNumber, int bufferSize, SbgDocumentRepository documentRepository) throws Exception {
@@ -105,7 +103,7 @@ public class SbgCrawlerDao {
 		}
 	}
 
-	public void upsertIndexDocumentsDb(SbgDocument index) {
+	public void insertIndexDocumentsDb(SbgDocument index) {
 		index.setId(documentIdCounter.getAndIncrement());
 		documentRepository.insertDocument(index);
 	}
@@ -125,30 +123,33 @@ public class SbgCrawlerDao {
 	public void insertReference(List<String> reference) {
 		getReferencesBufferQueue().addAll((reference));
 		if (getReferencesBufferQueue().size() > getBufferSize()) {
-			hasFilledOnce = true;
 			int n = getBufferPerThread();
-			try {
-				Statement createStatement = mariaDbConnection.createStatement();
-				while (n > 0) {
-					StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
-					for (int i = 1024000; builder.length() < i && n > 0; n--) {
-						String remove = getReferencesBufferQueue().remove().replaceAll("\'", "\'\'");
-						if (remove != null) {
-							builder.append("('");
-							builder.append(remove);
-							builder.append("'),");
-						} else {
-							break;
-						}
+			saveRefsOnDisk(n);
+		}
+	}
+
+	public void saveRefsOnDisk(Integer n) {
+		try {
+			Statement createStatement = mariaDbConnection.createStatement();
+			while (n > 0) {
+				StringBuilder builder = new StringBuilder(INSERT_REFERENCE_QUERY);
+				for (int i = 1024000; builder.length() < i && n > 0; n--) {
+					String remove = getReferencesBufferQueue().remove().replaceAll("\'", "\'\'");
+					if (remove != null) {
+						builder.append("('");
+						builder.append(remove);
+						builder.append("'),");
+					} else {
+						break;
 					}
-					builder.deleteCharAt(builder.length() - 1);
-					createStatement.addBatch(builder.toString());
 				}
-				createStatement.executeBatch();
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				builder.deleteCharAt(builder.length() - 1);
+				createStatement.addBatch(builder.toString());
 			}
+			createStatement.executeBatch();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
@@ -157,7 +158,7 @@ public class SbgCrawlerDao {
 	 */
 	public String getReference() {
 		// When reaches size of the buffer is time to fill it again
-		if (hasFilledOnce && getReferencesBufferQueue().size() < getBufferPerThread()) {
+		if (getReferencesBufferQueue().size() < getBufferPerThread()) {
 			try {
 				PreparedStatement prepareStatement = mariaDbConnection
 						.prepareStatement(SELECT_AND_REMOVE_REFERENCE_QUERY);
@@ -175,7 +176,7 @@ public class SbgCrawlerDao {
 	}
 
 	public int getBufferPerThread() {
-		return getReferencesBufferQueue().size() / getThreadNumber();
+		return getBufferSize() / getThreadNumber();
 	}
 
 	public static int getThreadNumber() {

@@ -72,7 +72,47 @@ public final class UriUtils {
 		return string.endsWith("/") ? string : string + "/";
 	}
 
-	public static String formatUri(String uri) throws URISyntaxException {
-		return new URI(uri).toString();
+	public static String formatUri(String uriPath) throws URISyntaxException {
+		URI uri = new URI(uriPath);
+		StringBuffer sb = new StringBuffer();
+		if (uri.getScheme() != null) {
+			sb.append(uri.getScheme());
+			sb.append(':');
+		}
+		if (uri.isOpaque()) {
+			sb.append(uri.getSchemeSpecificPart());
+		} else {
+			if (uri.getHost() != null) {
+				sb.append("//");
+				if (uri.getUserInfo() != null) {
+					sb.append(uri.getUserInfo());
+					sb.append('@');
+				}
+				boolean needBrackets = ((uri.getHost().indexOf(':') >= 0) && !uri.getHost().startsWith("[")
+						&& !uri.getHost().endsWith("]"));
+				if (needBrackets)
+					sb.append('[');
+				sb.append(uri.getHost());
+				if (needBrackets)
+					sb.append(']');
+				if (uri.getPort() != -1) {
+					sb.append(':');
+					sb.append(uri.getPort());
+				}
+			} else if (uri.getAuthority() != null) {
+				sb.append("//");
+				sb.append(uri.getAuthority());
+			}
+			if (uri.getPath() != null && !uri.getPath().isEmpty()) {
+				sb.append(uri.getPath());
+			} else {
+				sb.append("/");
+			}
+			if (uri.getQuery() != null) {
+				sb.append('?');
+				sb.append(uri.getQuery());
+			}
+		}
+		return sb.toString();
 	}
 }
