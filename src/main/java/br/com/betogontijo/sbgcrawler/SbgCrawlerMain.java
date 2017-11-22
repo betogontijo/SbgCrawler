@@ -87,15 +87,22 @@ public class SbgCrawlerMain {
 
 	@PreDestroy
 	public void onDestroy() {
-		System.out.println("Shutting down...");
+		System.out.println("Waiting all collectors to end...");
 		crawler.setCanceled(true);
 		try {
-			threadPoolExecutor.awaitTermination(1, TimeUnit.MINUTES);
+			boolean awaitTermination = threadPoolExecutor.awaitTermination(5, TimeUnit.MINUTES);
+			if (awaitTermination) {
+				System.out.println("All collectors have finished.");
+			} else {
+				System.out.println("Collectors was forced finishing, timeout reached.");
+			}
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("Writing "+dataSource.getReferencesBufferQueue().size()+" references from buffer on disk...");
+		System.out.println("Shutting down...");
+		System.out.println(
+				"Writing " + dataSource.getReferencesBufferQueue().size() + " references from buffer on disk...");
 		dataSource.saveRefsOnDisk(dataSource.getReferencesBufferQueue().size());
 		monitor.cancel();
 		System.out.println("Shutdown, buffer is down to " + dataSource.getReferencesBufferQueue().size() + ".");
