@@ -66,6 +66,10 @@ public class SbgCrawlerMain {
 		monitor = new SbgCrawlerPerformanceMonitor(dataSource);
 		monitor.start();
 
+		CountDownLatch latch = new CountDownLatch(threadNumber);
+
+		crawler = new SbgCrawler(dataSource, latch);
+		
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
@@ -87,20 +91,19 @@ public class SbgCrawlerMain {
 		// }
 		// }
 		threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
-		CountDownLatch latch = new CountDownLatch(threadNumber);
-
-		crawler = new SbgCrawler(dataSource, latch);
+		
 		while (threadPoolExecutor.getActiveCount() < threadNumber) {
 			threadPoolExecutor.execute(crawler);
 		}
 		latch.await();
-		monitor.cancel();
+		crawler.setCanceled(true);
 	}
 
 	@PreDestroy
 	public void onDestroy() {
 		System.out.println("Waiting all collectors to end...");
 		crawler.setCanceled(true);
+		monitor.cancel();
 		try {
 			boolean awaitTermination = threadPoolExecutor.awaitTermination(1, TimeUnit.MINUTES);
 			if (awaitTermination) {
@@ -116,7 +119,7 @@ public class SbgCrawlerMain {
 		System.out.println(
 				"Writing " + dataSource.getReferencesBufferQueue().size() + " references from buffer on disk...");
 		dataSource.saveRefsOnDisk(dataSource.getReferencesBufferQueue().size());
-		monitor.cancel();
+		threadPoolExecutor.shutdownNow();
 		System.out.println("Shutdown, buffer is down to " + dataSource.getReferencesBufferQueue().size() + ".");
 	}
 }

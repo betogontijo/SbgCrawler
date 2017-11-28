@@ -31,13 +31,15 @@ public class SbgCrawlerPerformanceMonitor extends Thread {
 				lastSize = atualSize;
 				atualSize = dataSource.getDocIdCounter();
 				overallRate = (atualSize - initialSize) / currentTime;
-				instantRate = (atualSize - lastSize) / printDelay;
-				System.out.printf(
-						"OverallRate: %.2fDoc/" + printDelay
-								+ "s, InstantRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\n",
-						overallRate, instantRate, atualSize, dataSource.getReferencesBufferQueue().size());
-				Thread.sleep(delayInMillis);
-				currentTime += printDelay;
+				if (overallRate > 0) {
+					instantRate = (atualSize - lastSize) / printDelay;
+					System.out.printf(
+							"OverallRate: %.2fDoc/" + printDelay
+									+ "s, InstantRate: %.2fDoc/s, TotalDocs: %d, QueueBufferSize: %d\n",
+							overallRate, instantRate, atualSize, dataSource.getReferencesBufferQueue().size());
+					Thread.sleep(delayInMillis);
+					currentTime += printDelay;
+				}
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
