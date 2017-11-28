@@ -9,14 +9,11 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 import br.com.betogontijo.sbgbeans.crawler.documents.SbgDocument;
 import crawlercommons.robots.SimpleRobotRulesParser;
@@ -31,9 +28,12 @@ public class SbgCrawler implements Runnable {
 
 	private boolean canceled;
 
-	SbgCrawler(SbgCrawlerDao dataSource) {
+	CountDownLatch latch;
+
+	SbgCrawler(SbgCrawlerDao dataSource, CountDownLatch latch) {
 		this.dataSource = dataSource;
 		setCanceled(false);
+		this.latch = latch;
 	}
 
 	/**
@@ -102,20 +102,21 @@ public class SbgCrawler implements Runnable {
 			sbgDocument.setLastModified(System.currentTimeMillis());
 
 			// Filter references
-			Elements links = doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
-					.not("[hreflang]").not("[href^=mailto]");
-			List<String> references = new ArrayList<String>();
-			for (Element element : links) {
-				try {
-					String href = UriUtils.formatUri(element.attr("abs:href"));
-					if (!href.isEmpty()) {
-						// Parse full path reference uri
-						references.add(href);
-					}
-				} catch (URISyntaxException e) {
-				}
-			}
-			dataSource.insertReference(references);
+			// Elements links =
+			// doc.select("[href]").not("[href~=(?i)\\.(png|jpe?g|css|gif|ico|js|json|mov)]")
+			// .not("[hreflang]").not("[href^=mailto]");
+			// List<String> references = new ArrayList<String>();
+			// for (Element element : links) {
+			// try {
+			// String href = UriUtils.formatUri(element.attr("abs:href"));
+			// if (!href.isEmpty()) {
+			// // Parse full path reference uri
+			// references.add(href);
+			// }
+			// } catch (URISyntaxException e) {
+			// }
+			// }
+			// dataSource.insertReference(references);
 		} catch (Exception e) {
 
 		}
@@ -123,11 +124,12 @@ public class SbgCrawler implements Runnable {
 
 	public static InputStream getInputStream(String uriPath)
 			throws MalformedURLException, IOException, URISyntaxException {
-		URI uri = new URI(uriPath);
+		// URI uri = new URI(uriPath);
+		URI uri = new URI("file://" + uriPath);
 		String scheme = uri.getScheme();
 
 		if (scheme.equalsIgnoreCase("file")) {
-			return new FileInputStream(new File(uri.getPath()));
+			return new FileInputStream(new File(uri.getSchemeSpecificPart()));
 		} else {
 			try {
 				return uri.toURL().openStream();
@@ -163,16 +165,14 @@ public class SbgCrawler implements Runnable {
 	 * @see java.lang.Runnable#run()
 	 */
 	public void run() {
-		try {
-			String reference = dataSource.getReference();
-			if (reference != null) {
+		String reference = null;
+		while ((reference = dataSource.getReference()) != null && !isCanceled()) {
+			try {
 				crawl(reference);
-			} else {
-				setCanceled(true);
+			} catch (Exception e) {
 			}
-		} catch (Exception e) {
-			// e.printStackTrace();
 		}
+		latch.countDown();
 	}
 
 	public boolean isCanceled() {

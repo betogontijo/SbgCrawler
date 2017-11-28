@@ -2,6 +2,7 @@ package br.com.betogontijo.sbgcrawler;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PreDestroy;
@@ -65,8 +66,6 @@ public class SbgCrawlerMain {
 		monitor = new SbgCrawlerPerformanceMonitor(dataSource);
 		monitor.start();
 
-		crawler = new SbgCrawler(dataSource);
-
 		// Loop through arguments used as seeds
 		for (int i = 0; i < seeds.length; i++) {
 			try {
@@ -75,13 +74,26 @@ public class SbgCrawlerMain {
 				e.printStackTrace();
 			}
 		}
+
+		// String root = "D:/WT10G/";
+		// for (String folder : new File(root).list()) {
+		// for (String subFolder : new File(root + folder).list()) {
+		// String subFolderPath = root + folder + "/" + subFolder;
+		// List<String> references = new ArrayList<String>();
+		// for (String file : new File(subFolderPath).list()) {
+		// references.add(subFolderPath + "/" + file);
+		// }
+		// dataSource.insertReference(references);
+		// }
+		// }
 		threadPoolExecutor = new SbgThreadPoolExecutor(threadNumber);
-		while (!crawler.isCanceled()) {
-			if (threadPoolExecutor.getActiveCount() < threadNumber) {
-				threadPoolExecutor.execute(crawler);
-			}
+		CountDownLatch latch = new CountDownLatch(threadNumber);
+
+		crawler = new SbgCrawler(dataSource, latch);
+		while (threadPoolExecutor.getActiveCount() < threadNumber) {
+			threadPoolExecutor.execute(crawler);
 		}
-		threadPoolExecutor.shutdown();
+		latch.await();
 		monitor.cancel();
 	}
 
@@ -90,7 +102,7 @@ public class SbgCrawlerMain {
 		System.out.println("Waiting all collectors to end...");
 		crawler.setCanceled(true);
 		try {
-			boolean awaitTermination = threadPoolExecutor.awaitTermination(5, TimeUnit.MINUTES);
+			boolean awaitTermination = threadPoolExecutor.awaitTermination(1, TimeUnit.MINUTES);
 			if (awaitTermination) {
 				System.out.println("All collectors have finished.");
 			} else {
